@@ -1,0 +1,6 @@
+{
+  "name": "Sítio-Escola Geranium",
+  "description": "Sistema de gestão de alunos, rematrículas, negociações financeiras e escalas de contraturno.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

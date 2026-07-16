@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student registration details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "nascimento": { "type": "string" },
+        "dataEntrada": { "type": "string" },
+        "observacoes": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "nome", "nascimento", "dataEntrada", "observacoes", "status"]
+    },
+    "Guardian": {
+      "title": "Guardian",
+      "description": "Guardian of a student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "alunoId": { "type": "string" },
+        "nome": { "type": "string" },
+        "parentesco": { "type": "string" },
+        "contato": { "type": "string" },
+        "financeiro": { "type": "boolean" }
+      },
+      "required": ["id", "alunoId", "nome", "parentesco", "contato", "financeiro"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Enrollment record of a student for a specific year",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "alunoId": { "type": "string" },
+        "ano": { "type": "integer" },
+        "turmaRegularId": { "type": "string" },
+        "valorRegularOriginal": { "type": "number" },
+        "descontoMensal": { "type": "number" },
+        "valorFinalRegular": { "type": "number" },
+        "statusNegociacao": { "type": "string" },
+        "anotacoes": { "type": "string" }
+      },
+      "required": ["id", "alunoId", "ano", "turmaRegularId", "valorRegularOriginal", "descontoMensal", "valorFinalRegular", "statusNegociacao", "anotacoes"]
+    },
+    "ContraturnoSegment": {
+      "title": "ContraturnoSegment",
+      "description": "Contraturno segment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "alunoId": { "type": "string" },
+        "dataInicio": { "type": "string" },
+        "dataFim": { "type": "string" },
+        "natureza": { "type": "string" },
+        "diasSemana": { "type": "array" },
+        "periodo": { "type": "string" },
+        "valorMensal": { "type": "number" }
+      },
+      "required": ["id", "alunoId", "dataInicio", "natureza", "diasSemana", "periodo", "valorMensal"]
+    },
+    "FinancialMovement": {
+      "title": "FinancialMovement",
+      "description": "Financial movement history record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "alunoId": { "type": "string" },
+        "data": { "type": "string" },
+        "tipo": { "type": "string" },
+        "descricao": { "type": "string" },
+        "valorAnterior": { "type": "number" },
+        "valorNovo": { "type": "number" }
+      },
+      "required": ["id", "alunoId", "data", "tipo", "descricao", "valorAnterior", "valorNovo"]
+    }
+  },
+  "firestore": {
+    "students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of students registered in the system"
+    },
+    "guardians/{guardianId}": {
+      "schema": "Guardian",
+      "description": "Collection of student guardians"
+    },
+    "enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Collection of regular enrollments"
+    },
+    "contraturnos/{segmentId}": {
+      "schema": "ContraturnoSegment",
+      "description": "Collection of historical or active contraturno segments"
+    },
+    "movements/{movementId}": {
+      "schema": "FinancialMovement",
+      "description": "Collection of logging or transaction updates"
+    }
+  }
+}

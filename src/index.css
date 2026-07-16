@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Quicksand:wght@500;600;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Quicksand", "Inter", sans-serif;
+  --font-serif: "Lora", serif;
+
+  --color-brand-green-dark: #1F3F24;
+  --color-brand-green-light: #4E7A53;
+  --color-brand-orange: #E06B3E;
+  --color-brand-orange-hover: #D05B2E;
+  --color-brand-cream: #FCFAF6;
+  --color-brand-sand: #F5F1E6;
+  --color-brand-clay: #A34E36;
+}
+
+/* Custom warm scrollbar and minor enhancements */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FCFAF6;
+}
+::-webkit-scrollbar-thumb {
+  background: #E5DEC9;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C4BA9B;
+}
+
+body {
+  background-color: #FCFAF6;
+  color: #2D3748;
+}

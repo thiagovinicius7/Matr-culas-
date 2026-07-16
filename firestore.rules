@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Entity validation functions
+    function isValidStudent(data) {
+      return data.keys().hasAll(['id', 'nome', 'nascimento', 'dataEntrada', 'observacoes', 'status'])
+        && data.keys().size() == 6
+        && data.id is string && data.id.size() <= 128
+        && data.nome is string && data.nome.size() <= 200
+        && data.nascimento is string && data.nascimento.size() == 10
+        && data.dataEntrada is string && data.dataEntrada.size() == 10
+        && data.observacoes is string && data.observacoes.size() <= 2000
+        && (data.status == 'ativo' || data.status == 'inativo');
+    }
+
+    function isValidGuardian(data) {
+      return data.keys().hasAll(['id', 'alunoId', 'nome', 'parentesco', 'contato', 'financeiro'])
+        && data.keys().size() == 6
+        && data.id is string && data.id.size() <= 128
+        && data.alunoId is string && data.alunoId.size() <= 128
+        && data.nome is string && data.nome.size() <= 200
+        && data.parentesco is string && data.parentesco.size() <= 50
+        && data.contato is string && data.contato.size() <= 200
+        && data.financeiro is bool;
+    }
+
+    function isValidEnrollment(data) {
+      return data.keys().hasAll(['id', 'alunoId', 'ano', 'turmaRegularId', 'valorRegularOriginal', 'descontoMensal', 'valorFinalRegular', 'statusNegociacao', 'anotacoes'])
+        && data.keys().size() == 9
+        && data.id is string && data.id.size() <= 128
+        && data.alunoId is string && data.alunoId.size() <= 128
+        && data.ano is int
+        && data.turmaRegularId is string && data.turmaRegularId.size() <= 50
+        && (data.valorRegularOriginal is int || data.valorRegularOriginal is float)
+        && (data.descontoMensal is int || data.descontoMensal is float)
+        && (data.valorFinalRegular is int || data.valorFinalRegular is float)
+        && (data.statusNegociacao == 'Pendente' || data.statusNegociacao == 'Em Negociação' || data.statusNegociacao == 'Confirmada' || data.statusNegociacao == 'Cancelada')
+        && data.anotacoes is string && data.anotacoes.size() <= 2000;
+    }
+
+    function isValidContraturnoSegment(data) {
+      return data.keys().hasAll(['id', 'alunoId', 'dataInicio', 'natureza', 'diasSemana', 'periodo', 'valorMensal'])
+        && (data.keys().size() == 7 || (data.keys().size() == 8 && data.keys().hasAll(['dataFim'])))
+        && data.id is string && data.id.size() <= 128
+        && data.alunoId is string && data.alunoId.size() <= 128
+        && data.dataInicio is string && data.dataInicio.size() == 10
+        && (!data.keys().hasAll(['dataFim']) || data.dataFim == null || (data.dataFim is string && data.dataFim.size() == 10))
+        && (data.natureza == 'Melaço' || data.natureza == 'Marmelada')
+        && data.diasSemana is list && data.diasSemana.size() <= 5
+        && (data.periodo == 'Parcial' || data.periodo == 'Completo')
+        && (data.valorMensal is int || data.valorMensal is float);
+    }
+
+    function isValidFinancialMovement(data) {
+      return data.keys().hasAll(['id', 'alunoId', 'data', 'tipo', 'descricao', 'valorAnterior', 'valorNovo'])
+        && data.keys().size() == 7
+        && data.id is string && data.id.size() <= 128
+        && data.alunoId is string && data.alunoId.size() <= 128
+        && data.data is string && data.data.size() == 10
+        && (data.tipo == 'Matrícula' || data.tipo == 'Contraturno_Ativação' || data.tipo == 'Contraturno_Cancelamento' || data.tipo == 'Desconto_Alterado' || data.tipo == 'Reajuste_Geral')
+        && data.descricao is string && data.descricao.size() <= 2000
+        && (data.valorAnterior is int || data.valorAnterior is float)
+        && (data.valorNovo is int || data.valorNovo is float);
+    }
+
+    // Rules for each collection
+    match /students/{studentId} {
+      allow read: if true;
+      allow create: if isValidId(studentId) && isValidStudent(incoming());
+      allow update: if isValidId(studentId) && isValidStudent(incoming());
+      allow delete: if isValidId(studentId);
+    }
+
+    match /guardians/{guardianId} {
+      allow read: if true;
+      allow create: if isValidId(guardianId) && isValidGuardian(incoming());
+      allow update: if isValidId(guardianId) && isValidGuardian(incoming());
+      allow delete: if isValidId(guardianId);
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if true;
+      allow create: if isValidId(enrollmentId) && isValidEnrollment(incoming());
+      allow update: if isValidId(enrollmentId) && isValidEnrollment(incoming());
+      allow delete: if isValidId(enrollmentId);
+    }
+
+    match /contraturnos/{segmentId} {
+      allow read: if true;
+      allow create: if isValidId(segmentId) && isValidContraturnoSegment(incoming());
+      allow update: if isValidId(segmentId) && isValidContraturnoSegment(incoming());
+      allow delete: if isValidId(segmentId);
+    }
+
+    match /movements/{movementId} {
+      allow read: if true;
+      allow create: if isValidId(movementId) && isValidFinancialMovement(incoming());
+      allow update: if isValidId(movementId) && isValidFinancialMovement(incoming());
+      allow delete: if isValidId(movementId);
+    }
+
+    match /test/{testId} {
+      allow read, write: if true;
+    }
+  }
+}
