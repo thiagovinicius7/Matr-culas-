@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle } from 'lucide-react';
@@ -10,6 +10,8 @@ interface StudentProfileProps {
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
   movements: FinancialMovement[];
+  selectedStudentId?: string;
+  onSelectStudent?: (id: string) => void;
   onAddStudent: (student: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
@@ -23,19 +25,27 @@ export default function StudentProfile({
   enrollments,
   contraturnos,
   movements,
+  selectedStudentId: propSelectedStudentId,
+  onSelectStudent,
   onAddStudent,
   onUpdateStudent,
   onDeleteStudent,
   onAddGuardian,
   onDeleteGuardian
 }: StudentProfileProps) {
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(students[0]?.id || '');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   // Controla se o painel de detalhes aparece como overlay em telas pequenas
   // (evita ter que rolar até o fim da lista para ver a ficha do aluno)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+
+  useEffect(() => {
+    if (propSelectedStudentId) {
+      setSelectedStudentId(propSelectedStudentId);
+    }
+  }, [propSelectedStudentId]);
 
   // Form states for new/editing student
   const [formNome, setFormNome] = useState('');
@@ -214,6 +224,7 @@ export default function StudentProfile({
                 key={st.id}
                 onClick={() => {
                   setSelectedStudentId(st.id);
+                  onSelectStudent?.(st.id);
                   setIsAddingStudent(false);
                   setIsEditingStudent(false);
                   setIsAddingSingleGuardian(false);

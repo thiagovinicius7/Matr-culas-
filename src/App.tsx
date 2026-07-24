@@ -42,6 +42,9 @@ export default function App() {
   const [contraturnos, setContraturnos] = useState<ContraturnoSegment[]>([]);
   const [movements, setMovements] = useState<FinancialMovement[]>([]);
 
+  // Selected student ID shared across components
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+
   // Sync state with Firebase on mount
   useEffect(() => {
     async function initFirebase() {
@@ -59,11 +62,16 @@ export default function App() {
           getCollectionData<FinancialMovement>('movements')
         ]);
         
-        setStudents(loadedStudents);
+        const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        setStudents(sortedStudents);
         setGuardians(loadedGuardians);
         setEnrollments(loadedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
+
+        if (sortedStudents.length > 0) {
+          setSelectedStudentId(sortedStudents[0].id);
+        }
       } catch (error) {
         console.error('Error loading data from Firebase:', error);
       } finally {
@@ -73,6 +81,19 @@ export default function App() {
     
     initFirebase();
   }, []);
+
+  // Update selectedStudentId when students are loaded/changed if not set
+  useEffect(() => {
+    if (students.length > 0 && !selectedStudentId) {
+      setSelectedStudentId(students[0].id);
+    }
+  }, [students, selectedStudentId]);
+
+  // Handle direct navigation to a tab for a specific student
+  const handleNavigateWithStudent = (tabId: string, studentId: string) => {
+    setSelectedStudentId(studentId);
+    setActiveTab(tabId);
+  };
 
   // Handler: Clear all data (removes mock students)
   const handleClearDatabase = async () => {
@@ -84,6 +105,7 @@ export default function App() {
       setEnrollments([]);
       setContraturnos([]);
       setMovements([]);
+      setSelectedStudentId('');
     } catch (error) {
       console.error('Error clearing database:', error);
     } finally {
@@ -124,12 +146,16 @@ export default function App() {
         contraturnosList.length + ' contraturnos carregados.'
       );
 
+      const sortedImported = [...IMPORTED_STUDENTS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       // Set local state to the clean imported dataset only
-      setStudents(IMPORTED_STUDENTS);
+      setStudents(sortedImported);
       setGuardians(guardiansList);
       setEnrollments(enrollmentsList);
       setContraturnos(contraturnosList);
       setMovements([]);
+      if (sortedImported.length > 0) {
+        setSelectedStudentId(sortedImported[0].id);
+      }
 
     } catch (error) {
       console.error('Error importing Geranium data:', error);
@@ -142,7 +168,7 @@ export default function App() {
   // Handler: Add new student with guardians
   const handleAddStudent = (newStudent: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]) => {
     // 1. Add student
-    setStudents(prev => [...prev, newStudent]);
+    setStudents(prev => [...prev, newStudent].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     saveDocument('students', newStudent);
 
     // 2. Generate and add Guardians
@@ -189,7 +215,7 @@ export default function App() {
 
   // Handler: Edit basic student details
   const handleUpdateStudent = (updatedStudent: Student) => {
-    setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
+    setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     saveDocument('students', updatedStudent);
 
     // If birthday changed, recalculate regular class and adjust enrollment base price
@@ -608,6 +634,7 @@ export default function App() {
                   enrollments={enrollments} 
                   contraturnos={contraturnos} 
                   onNavigate={setActiveTab} 
+                  onNavigateWithStudent={handleNavigateWithStudent}
                   onImportGeraniumData={handleImportGeraniumData}
                   onClearDatabase={handleClearDatabase}
                 />
@@ -619,6 +646,8 @@ export default function App() {
                   enrollments={enrollments} 
                   contraturnos={contraturnos} 
                   movements={movements}
+                  selectedStudentId={selectedStudentId}
+                  onSelectStudent={setSelectedStudentId}
                   onAddStudent={handleAddStudent}
                   onUpdateStudent={handleUpdateStudent}
                   onDeleteStudent={handleDeleteStudent}
@@ -632,6 +661,8 @@ export default function App() {
                   guardians={guardians} 
                   enrollments={enrollments} 
                   contraturnos={contraturnos}
+                  selectedStudentId={selectedStudentId}
+                  onSelectStudent={setSelectedStudentId}
                   onConfirmNegotiation={handleConfirmNegotiation}
                 />
               )}
@@ -641,6 +672,7 @@ export default function App() {
                   guardians={guardians} 
                   enrollments={enrollments} 
                   contraturnos={contraturnos}
+                  preselectedStudentId={selectedStudentId}
                   onUpdateEnrollmentStatus={handleUpdateEnrollmentStatus}
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
                 />

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Student, Enrollment, ContraturnoSegment } from '../types';
-import { REGULAR_CLASSES } from '../data';
-import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
+import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface DashboardProps {
@@ -9,11 +9,22 @@ interface DashboardProps {
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
   onNavigate: (tab: string) => void;
+  onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onImportGeraniumData?: () => void;
   onClearDatabase?: () => void;
 }
 
-export default function Dashboard({ students, enrollments, contraturnos, onNavigate, onImportGeraniumData, onClearDatabase }: DashboardProps) {
+export default function Dashboard({ 
+  students, 
+  enrollments, 
+  contraturnos, 
+  onNavigate, 
+  onNavigateWithStudent,
+  onImportGeraniumData, 
+  onClearDatabase 
+}: DashboardProps) {
+  const [quickSearch, setQuickSearch] = useState('');
+
   // Stats calculations
   const activeStudents = students.filter(s => s.status === 'ativo');
   const totalStudentsCount = students.length;
@@ -63,6 +74,79 @@ export default function Dashboard({ students, enrollments, contraturnos, onNavig
           <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse"></span>
           Período Letivo: 2026
         </div>
+      </div>
+
+      {/* Busca Rápida de Alunos e Acesso Direto */}
+      <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs p-5 space-y-4" id="quick-student-search-panel">
+        <div className="flex items-center gap-2 text-brand-green-dark">
+          <Search size={18} className="text-brand-orange stroke-[2.5]" />
+          <h3 className="font-display font-bold text-sm uppercase tracking-wider">
+            Busca Rápida de Alunos • Acesso Direto
+          </h3>
+        </div>
+        <p className="text-xs text-slate-500">
+          Pesquise por qualquer aluno para visualizar ou editar diretamente sua Ficha, calcular seu Acordo de Rematrícula ou gerenciar seus Contatos na Lista de Trabalho.
+        </p>
+
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Digite o nome do aluno..."
+            value={quickSearch}
+            onChange={(e) => setQuickSearch(e.target.value)}
+            className="w-full text-xs px-4 py-2.5 rounded-lg border border-slate-200 focus:border-brand-green-light focus:ring-1 focus:ring-brand-green-light focus:outline-none bg-slate-50/50"
+          />
+        </div>
+
+        {quickSearch.trim().length > 0 && (
+          <div className="border border-slate-150 rounded-lg overflow-hidden divide-y divide-slate-100 bg-white">
+            {students
+              .filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase()))
+              .slice(0, 5)
+              .map(student => {
+                const age = calculateAgeAtCutoff(student.nascimento, 2026);
+                const regularClass = getRegularClassForAge(age);
+                return (
+                  <div key={student.id} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/50 transition-colors">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-slate-800">{student.nome}</h4>
+                      <p className="text-[10px] text-slate-500">
+                        Idade: {age} anos • Turma Regular: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <button
+                        onClick={() => onNavigateWithStudent?.('students', student.id)}
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileText size={12} />
+                        Ficha do Aluno
+                      </button>
+                      <button
+                        onClick={() => onNavigateWithStudent?.('negotiation', student.id)}
+                        className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Calculator size={12} />
+                        Calculadora
+                      </button>
+                      <button
+                        onClick={() => onNavigateWithStudent?.('rematricula', student.id)}
+                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[10px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <ClipboardList size={12} />
+                        Lista de Trabalho
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            {students.filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
+              <div className="p-4 text-center text-xs text-slate-400 italic">
+                Nenhum aluno encontrado com "{quickSearch}".
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Ferramenta de Importação e Gestão de Alunos */}

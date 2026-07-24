@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment } from '../types';
 import { REGULAR_CLASSES } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit, Check } from 'lucide-react';
@@ -9,6 +9,7 @@ interface RematriculaListProps {
   guardians: Guardian[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
+  preselectedStudentId?: string;
   onUpdateEnrollmentStatus: (alunoId: string, status: Enrollment['statusNegociacao']) => void;
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
 }
@@ -18,11 +19,21 @@ export default function RematriculaList({
   guardians,
   enrollments,
   contraturnos,
+  preselectedStudentId,
   onUpdateEnrollmentStatus,
   onUpdateEnrollmentNotes
 }: RematriculaListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (preselectedStudentId) {
+      const student = students.find(s => s.id === preselectedStudentId);
+      if (student) {
+        setSearchQuery(student.nome);
+      }
+    }
+  }, [preselectedStudentId, students]);
   const [editingNotesStudentId, setEditingNotesStudentId] = useState<string | null>(null);
   const [tempNotesValue, setTempNotesValue] = useState('');
 

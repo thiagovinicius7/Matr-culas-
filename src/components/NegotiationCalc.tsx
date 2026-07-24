@@ -9,6 +9,8 @@ interface NegotiationCalcProps {
   guardians: Guardian[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
+  selectedStudentId?: string;
+  onSelectStudent?: (id: string) => void;
   onConfirmNegotiation: (
     alunoId: string,
     enrollmentData: Omit<Enrollment, 'id' | 'alunoId'>,
@@ -21,9 +23,17 @@ export default function NegotiationCalc({
   guardians,
   enrollments,
   contraturnos,
+  selectedStudentId: propSelectedStudentId,
+  onSelectStudent,
   onConfirmNegotiation
 }: NegotiationCalcProps) {
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || '');
+
+  useEffect(() => {
+    if (propSelectedStudentId) {
+      setSelectedStudentId(propSelectedStudentId);
+    }
+  }, [propSelectedStudentId]);
   
   // Negotiation states
   const [discountVal, setDiscountVal] = useState<number>(0);
@@ -147,7 +157,10 @@ export default function NegotiationCalc({
             <label className="text-xs font-bold text-slate-600 block">Selecione o Aluno</label>
             <select
               value={selectedStudentId}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
+              onChange={(e) => {
+                setSelectedStudentId(e.target.value);
+                onSelectStudent?.(e.target.value);
+              }}
               className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white cursor-pointer"
             >
               <option value="">-- Selecione um aluno cadastrado --</option>
