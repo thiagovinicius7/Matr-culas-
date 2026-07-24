@@ -19,7 +19,6 @@ service cloud.firestore {
     // Entity validation functions
     function isValidStudent(data) {
       return data.keys().hasAll(['id', 'nome', 'nascimento', 'dataEntrada', 'observacoes', 'status'])
-        && data.keys().size() == 6
         && data.id is string && data.id.size() <= 128
         && data.nome is string && data.nome.size() <= 200
         && data.nascimento is string && data.nascimento.size() == 10
@@ -30,7 +29,6 @@ service cloud.firestore {
 
     function isValidGuardian(data) {
       return data.keys().hasAll(['id', 'alunoId', 'nome', 'parentesco', 'contato', 'financeiro'])
-        && data.keys().size() == 6
         && data.id is string && data.id.size() <= 128
         && data.alunoId is string && data.alunoId.size() <= 128
         && data.nome is string && data.nome.size() <= 200
@@ -40,8 +38,7 @@ service cloud.firestore {
     }
 
     function isValidEnrollment(data) {
-      return data.keys().hasAll(['id', 'alunoId', 'ano', 'turmaRegularId', 'valorRegularOriginal', 'descontoMensal', 'valorFinalRegular', 'statusNegociacao', 'anotacoes'])
-        && data.keys().size() == 9
+      return data.keys().hasAll(['id', 'alunoId', 'ano', 'turmaRegularId', 'valorRegularOriginal', 'descontoMensal', 'valorFinalRegular', 'statusNegociacao'])
         && data.id is string && data.id.size() <= 128
         && data.alunoId is string && data.alunoId.size() <= 128
         && data.ano is int
@@ -50,12 +47,16 @@ service cloud.firestore {
         && (data.descontoMensal is int || data.descontoMensal is float)
         && (data.valorFinalRegular is int || data.valorFinalRegular is float)
         && (data.statusNegociacao == 'Pendente' || data.statusNegociacao == 'Em Negociação' || data.statusNegociacao == 'Confirmada' || data.statusNegociacao == 'Cancelada')
-        && data.anotacoes is string && data.anotacoes.size() <= 2000;
+        && (!data.keys().hasAll(['anotacoes']) || data.anotacoes is string)
+        && (!data.keys().hasAll(['descontoContraturno']) || data.descontoContraturno is int || data.descontoContraturno is float)
+        && (!data.keys().hasAll(['tipoDescontoRegular']) || data.tipoDescontoRegular is string)
+        && (!data.keys().hasAll(['valorDescontoRegularInput']) || data.valorDescontoRegularInput is int || data.valorDescontoRegularInput is float)
+        && (!data.keys().hasAll(['tipoDescontoContraturno']) || data.tipoDescontoContraturno is string)
+        && (!data.keys().hasAll(['valorDescontoContraturnoInput']) || data.valorDescontoContraturnoInput is int || data.valorDescontoContraturnoInput is float);
     }
 
     function isValidContraturnoSegment(data) {
       return data.keys().hasAll(['id', 'alunoId', 'dataInicio', 'natureza', 'diasSemana', 'periodo', 'valorMensal'])
-        && (data.keys().size() == 7 || (data.keys().size() == 8 && data.keys().hasAll(['dataFim'])))
         && data.id is string && data.id.size() <= 128
         && data.alunoId is string && data.alunoId.size() <= 128
         && data.dataInicio is string && data.dataInicio.size() == 10
@@ -68,7 +69,6 @@ service cloud.firestore {
 
     function isValidFinancialMovement(data) {
       return data.keys().hasAll(['id', 'alunoId', 'data', 'tipo', 'descricao', 'valorAnterior', 'valorNovo'])
-        && data.keys().size() == 7
         && data.id is string && data.id.size() <= 128
         && data.alunoId is string && data.alunoId.size() <= 128
         && data.data is string && data.data.size() == 10
@@ -80,7 +80,6 @@ service cloud.firestore {
 
     function isValidRegularClass(data) {
       return data.keys().hasAll(['id', 'nome', 'natureza', 'idadeRef', 'valorMensal'])
-        && (data.keys().size() == 5 || (data.keys().size() == 6 && data.keys().hasAll(['ano'])))
         && data.id is string && data.id.size() <= 128
         && data.nome is string && data.nome.size() <= 100
         && (data.natureza == 'Infantil' || data.natureza == 'Fundamental')
@@ -91,7 +90,6 @@ service cloud.firestore {
 
     function isValidContraturnoPrice(data) {
       return data.keys().hasAll(['id', 'frequencia', 'valorParcial', 'valorCompleto'])
-        && (data.keys().size() == 4 || (data.keys().size() == 5 && data.keys().hasAll(['ano'])))
         && data.id is string && data.id.size() <= 128
         && data.frequencia is int
         && (data.valorParcial is int || data.valorParcial is float)
