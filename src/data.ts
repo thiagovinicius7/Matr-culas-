@@ -7,10 +7,10 @@ export const REGULAR_CLASSES: RegularClass[] = [
   { id: 'mandacaia_1', nome: 'Mandaçaia 1', natureza: 'Infantil', idadeRef: 4, valorMensal: 1800 },
   { id: 'mandacaia_2', nome: 'Mandaçaia 2', natureza: 'Infantil', idadeRef: 5, valorMensal: 1900 },
   { id: 'jatai', nome: 'Jataí', natureza: 'Fundamental', idadeRef: 6, valorMensal: 2100 },
-  { id: 'urucu', nome: 'Urucu', natureza: 'Fundamental', idadeRef: 7, valorMensal: 2200 },
+  { id: 'urucu', nome: 'Uruçu', natureza: 'Fundamental', idadeRef: 7, valorMensal: 2200 },
   { id: 'irai', nome: 'Iraí', natureza: 'Fundamental', idadeRef: 8, valorMensal: 2300 },
   { id: 'abelha_branca', nome: 'Abelha Branca', natureza: 'Fundamental', idadeRef: 9, valorMensal: 2400 },
-  { id: 'benjoi', nome: 'Benjoi', natureza: 'Fundamental', idadeRef: 10, valorMensal: 2500 }
+  { id: 'benjoi', nome: 'Benjoí', natureza: 'Fundamental', idadeRef: 10, valorMensal: 2500 }
 ];
 
 // Helper to calculate student age at March 31 of enrollment year
@@ -42,10 +42,10 @@ export function getRegularClassForAge(age: number): RegularClass {
   if (age === 4) return REGULAR_CLASSES[2]; // Mandaçaia 1
   if (age === 5) return REGULAR_CLASSES[3]; // Mandaçaia 2
   if (age === 6) return REGULAR_CLASSES[4]; // Jataí
-  if (age === 7) return REGULAR_CLASSES[5]; // Urucu
+  if (age === 7) return REGULAR_CLASSES[5]; // Uruçu
   if (age === 8) return REGULAR_CLASSES[6]; // Iraí
   if (age === 9) return REGULAR_CLASSES[7]; // Abelha Branca
-  return REGULAR_CLASSES[8]; // Benjoi (10+)
+  return REGULAR_CLASSES[8]; // Benjoí (10+)
 }
 
 // Get Contraturno monthly base price or daily fee (avulso)

@@ -28,6 +28,9 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
   // Helper to find student details
   const getStudentInfo = (alunoId: string) => students.find(s => s.id === alunoId);
 
+  // Horário de saída real: Parcial = até 15h, Completo = até 17h30
+  const horarioSaida = (periodo: 'Parcial' | 'Completo') => periodo === 'Parcial' ? 'Saída 15h' : 'Saída 17h30';
+
   // Group active contraturnos by day of week
   const getAttendeesForDay = (day: WeekDay) => {
     return activeContraturnos
@@ -80,8 +83,9 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                     <div className="space-y-1">
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Melaço</h4>
                       {melaco.map(a => (
-                        <div key={a.segment.id} className="text-[9px]">
+                        <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
                           <span className="font-medium">• {a.student?.nome.split(' ')[0]}</span>
+                          <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
                         </div>
                       ))}
                       {melaco.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
@@ -91,8 +95,9 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                     <div className="space-y-1">
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Marmelada</h4>
                       {marmelada.map(a => (
-                        <div key={a.segment.id} className="text-[9px]">
+                        <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
                           <span className="font-medium">• {a.student?.nome.split(' ')[0]}</span>
+                          <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
                         </div>
                       ))}
                       {marmelada.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
@@ -116,7 +121,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                   <th className="p-2 border-r border-slate-300 text-center">Qua</th>
                   <th className="p-2 border-r border-slate-300 text-center">Qui</th>
                   <th className="p-2 border-r border-slate-300 text-center">Sex</th>
-                  <th className="p-2 text-center">Período</th>
+                  <th className="p-2 text-center">Saída</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-300 text-[10px]">
@@ -132,7 +137,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                           {c.diasSemana.includes(day) ? 'X' : ''}
                         </td>
                       ))}
-                      <td className="p-2 text-center font-medium">{c.periodo}</td>
+                      <td className="p-2 text-center font-medium">{horarioSaida(c.periodo)}</td>
                     </tr>
                   );
                 })}
@@ -227,7 +232,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                         <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-100 hover:bg-white transition-all space-y-1">
                           <span className="font-bold text-[11px] text-slate-800 block leading-tight">{student?.nome}</span>
                           <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-slate-200 text-slate-700">
-                            {segment.periodo}
+                            {horarioSaida(segment.periodo)}
                           </span>
                         </div>
                       ))}
@@ -248,7 +253,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                         <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-100 hover:bg-white transition-all space-y-1">
                           <span className="font-bold text-[11px] text-slate-800 block leading-tight">{student?.nome}</span>
                           <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-slate-200 text-slate-700">
-                            {segment.periodo}
+                            {horarioSaida(segment.periodo)}
                           </span>
                         </div>
                       ))}
@@ -283,7 +288,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                     <th key={day} className="p-3 text-center">{day}</th>
                   ))}
                   <th className="p-3 text-center">Frequência</th>
-                  <th className="p-3 text-center">Período</th>
+                  <th className="p-3 text-center">Saída</th>
                   <th className="p-3 text-right">Valor Mensal</th>
                 </tr>
               </thead>
@@ -317,7 +322,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                       <td className="p-3 text-center font-bold text-slate-500 text-[11px]">{c.diasSemana.length}x / semana</td>
                       <td className="p-3 text-center">
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {c.periodo}
+                          {horarioSaida(c.periodo)}
                         </span>
                       </td>
                       <td className="p-3 text-right font-mono font-bold text-slate-900">

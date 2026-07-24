@@ -33,6 +33,9 @@ export default function StudentProfile({
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isEditingStudent, setIsEditingStudent] = useState(false);
+  // Controla se o painel de detalhes aparece como overlay em telas pequenas
+  // (evita ter que rolar até o fim da lista para ver a ficha do aluno)
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   // Form states for new/editing student
   const [formNome, setFormNome] = useState('');
@@ -75,6 +78,7 @@ export default function StudentProfile({
     setFormStatus('ativo');
     setTempGuardians([{ nome: '', parentesco: 'Mãe', contato: '', financeiro: true }]);
     setIsAddingStudent(true);
+    setMobileDetailOpen(true);
   };
 
   const saveNewStudent = (e: React.FormEvent) => {
@@ -118,6 +122,7 @@ export default function StudentProfile({
     setFormObservacoes(activeStudent.observacoes);
     setFormStatus(activeStudent.status);
     setIsEditingStudent(true);
+    setMobileDetailOpen(true);
   };
 
   const saveEditStudent = (e: React.FormEvent) => {
@@ -212,6 +217,7 @@ export default function StudentProfile({
                   setIsAddingStudent(false);
                   setIsEditingStudent(false);
                   setIsAddingSingleGuardian(false);
+                  setMobileDetailOpen(true);
                 }}
                 className={`w-full text-left p-2.5 rounded-md transition-all flex items-center justify-between cursor-pointer ${
                   isSelected ? 'bg-emerald-50 border-l-4 border-emerald-600' : 'hover:bg-slate-50'
@@ -242,8 +248,20 @@ export default function StudentProfile({
         </div>
       </div>
 
-      {/* Main Panel: Selected Ficha or Add Student form */}
-      <div className="lg:col-span-8">
+      {/* Main Panel: Selected Ficha or Add Student form.
+          No mobile, funciona como um overlay de tela cheia (evita ter que
+          rolar até o fim da lista para ver a ficha); no desktop (lg+) fica
+          sempre visível lado a lado com a lista. */}
+      <div className={
+        (mobileDetailOpen ? 'fixed inset-0 z-50 bg-slate-50 overflow-y-auto p-4 ' : 'hidden ') +
+        'lg:static lg:z-auto lg:bg-transparent lg:p-0 lg:overflow-visible lg:block lg:col-span-8'
+      }>
+        <button
+          onClick={() => setMobileDetailOpen(false)}
+          className="lg:hidden flex items-center gap-1 text-xs font-bold text-slate-600 mb-3 cursor-pointer"
+        >
+          ‹ Voltar para a lista
+        </button>
         <AnimatePresence mode="wait">
           {isAddingStudent ? (
             /* ADD NEW STUDENT FORM */
