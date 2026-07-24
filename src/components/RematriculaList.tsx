@@ -223,6 +223,11 @@ export default function RematriculaList({
                               + Contraturno ({activeContraturno.natureza})
                             </span>
                           )}
+                          {enrollment.descontoPontualidade && (
+                            <span className="text-[9px] bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
+                              3% Pontualidade
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -333,10 +338,20 @@ export default function RematriculaList({
                               <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.valorLanche || 0)}</span>
                             </div>
                           )}
+                          {enrollment.descontoPontualidade && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-blue-500 font-medium">
+                              <span>Pontualidade (3%):</span>
+                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number((totalNegotiatedMonthly * 0.03).toFixed(2)))}</span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center max-w-[150px] font-bold text-slate-900 text-xs">
-                            <span>Total Mensal:</span>
+                            <span>{enrollment.descontoPontualidade ? 'Líquido Pontual:' : 'Total Mensal:'}</span>
                             <div className="flex items-center gap-1">
-                              <span className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalNegotiatedMonthly)}</span>
+                              <span className="font-mono text-slate-900">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                  totalNegotiatedMonthly - (enrollment.descontoPontualidade ? Number((totalNegotiatedMonthly * 0.03).toFixed(2)) : 0)
+                                )}
+                              </span>
                               <button
                                 onClick={() => {
                                   setEditingDiscountId(enrollment.id);

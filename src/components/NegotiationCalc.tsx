@@ -52,6 +52,7 @@ export default function NegotiationCalc({
 
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
+  const [descontoPontualidade, setDescontoPontualidade] = useState<boolean>(false);
 
   // Contraturno choice
   const [enableContraturno, setEnableContraturno] = useState<boolean>(false);
@@ -94,7 +95,7 @@ export default function NegotiationCalc({
 
   // Calculate discount value in Reais
   const discountVal = discountType === 'porcentagem'
-    ? Math.round(regularBasePrice * (discountInput / 100))
+    ? Number((regularBasePrice * (discountInput / 100)).toFixed(2))
     : discountInput;
 
   const regularWithDiscount = Math.max(0, regularBasePrice - discountVal);
@@ -104,7 +105,7 @@ export default function NegotiationCalc({
 
   // Calculate contraturno discount value in Reais
   const contraturnoDiscountVal = contraturnoDiscountType === 'porcentagem'
-    ? Math.round(contraturnoPrice * (contraturnoDiscountInput / 100))
+    ? Number((contraturnoPrice * (contraturnoDiscountInput / 100)).toFixed(2))
     : contraturnoDiscountInput;
 
   const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
@@ -124,6 +125,7 @@ export default function NegotiationCalc({
         setNotes(existing.anotacoes);
         setAddLanche(existing.adicionarLanche !== undefined ? existing.adicionarLanche : false);
         setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 200);
+        setDescontoPontualidade(existing.descontoPontualidade !== undefined ? existing.descontoPontualidade : false);
       } else {
         setDiscountType('reais');
         setDiscountInput(0);
@@ -133,6 +135,7 @@ export default function NegotiationCalc({
         setNotes('');
         setAddLanche(false);
         setLancheValue(200);
+        setDescontoPontualidade(false);
       }
 
       // Check for active contraturno for this student
@@ -178,7 +181,8 @@ export default function NegotiationCalc({
       tipoDescontoContraturno: contraturnoDiscountType,
       valorDescontoContraturnoInput: contraturnoDiscountInput,
       adicionarLanche: addLanche && regularClass?.natureza === 'Fundamental',
-      valorLanche: addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0
+      valorLanche: addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0,
+      descontoPontualidade: descontoPontualidade
     };
 
     const contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null = enableContraturno && weeklyFrequency > 0 ? {
@@ -307,6 +311,27 @@ export default function NegotiationCalc({
                     )}
                   </div>
                 )}
+
+                {/* Option to add prompt payment discount */}
+                <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="desconto-pontualidade"
+                      checked={descontoPontualidade}
+                      onChange={(e) => setDescontoPontualidade(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
+                    />
+                    <label htmlFor="desconto-pontualidade" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                      Desconto de Pontualidade (3% se pago até o vencimento)
+                    </label>
+                  </div>
+                  {descontoPontualidade && (
+                    <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded-full uppercase">
+                      Ativo (3% Off)
+                    </span>
+                  )}
+                </div>
 
                 {/* Discount and negotiation settings */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -620,19 +645,49 @@ export default function NegotiationCalc({
                       </div>
                     </div>
                   )}
+
+                  {/* Desconto de Pontualidade Summary */}
+                  <div className="flex justify-between text-xs text-blue-600 border-t border-slate-100 pt-1">
+                    <span>Desconto de Pontualidade (3%):</span>
+                    <span className="font-mono font-semibold">
+                      {descontoPontualidade ? 'Ativo (Aplicado se pago até o vencimento)' : 'Inativo'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Grand Total box */}
-                <div className="p-4 bg-emerald-950 text-white rounded-lg space-y-1">
-                  <span className="text-[9px] uppercase font-bold tracking-wider text-orange-300">Valor Mensal Integrado</span>
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xl font-bold font-mono">
+                <div className="p-4 bg-emerald-950 text-white rounded-lg space-y-2">
+                  <div>
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-300 block">Subtotal Mensal</span>
+                    <span className="text-sm font-semibold font-mono text-slate-300 line-through">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalMonthlyCommitment)}
                     </span>
-                    <span className="text-[10px] text-orange-300">/mês</span>
                   </div>
-                  <p className="text-[9px] text-emerald-300 pt-1 border-t border-emerald-900">
-                    Soma de Ensino Regular (com desconto) + Contraturno{(addLanche && regularClass?.natureza === 'Fundamental') ? ' + Lanche' : ''}.
+                  
+                  {descontoPontualidade && (
+                    <div className="flex justify-between text-xs text-emerald-300">
+                      <span>Desconto de Pontualidade (3%):</span>
+                      <span className="font-mono font-bold">
+                        -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number((totalMonthlyCommitment * 0.03).toFixed(2)))}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-1 border-t border-emerald-900">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-orange-300 block">
+                      {descontoPontualidade ? 'Valor Final com Pontualidade' : 'Valor Final Mensal'}
+                    </span>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-xl font-bold font-mono text-white">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          totalMonthlyCommitment - (descontoPontualidade ? Number((totalMonthlyCommitment * 0.03).toFixed(2)) : 0)
+                        )}
+                      </span>
+                      <span className="text-[10px] text-orange-300">/mês</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-emerald-400">
+                    Soma de Ensino Regular{(addLanche && regularClass?.natureza === 'Fundamental') ? ' + Lanche' : ''} + Contraturno{descontoPontualidade ? ' (menos 3% se pago em dia)' : ''}.
                   </p>
                 </div>
 

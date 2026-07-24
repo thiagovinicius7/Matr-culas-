@@ -54,7 +54,8 @@ service cloud.firestore {
         && (!data.keys().hasAll(['tipoDescontoContraturno']) || data.tipoDescontoContraturno is string)
         && (!data.keys().hasAll(['valorDescontoContraturnoInput']) || data.valorDescontoContraturnoInput is int || data.valorDescontoContraturnoInput is float)
         && (!data.keys().hasAll(['adicionarLanche']) || data.adicionarLanche is bool)
-        && (!data.keys().hasAll(['valorLanche']) || data.valorLanche is int || data.valorLanche is float);
+        && (!data.keys().hasAll(['valorLanche']) || data.valorLanche is int || data.valorLanche is float)
+        && (!data.keys().hasAll(['descontoPontualidade']) || data.descontoPontualidade is bool);
     }
 
     function isValidContraturnoSegment(data) {

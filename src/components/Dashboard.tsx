@@ -46,7 +46,9 @@ export default function Dashboard({
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
-      return sum + e.valorFinalRegular + lancheVal;
+      const subtotal = e.valorFinalRegular + lancheVal;
+      const discountVal = e.descontoPontualidade ? Number((subtotal * 0.03).toFixed(2)) : 0;
+      return sum + (subtotal - discountVal);
     }, 0);
 
   const activeContraturnos = contraturnos.filter(c => c.dataFim === null);

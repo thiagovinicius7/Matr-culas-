@@ -516,8 +516,9 @@ export default function App() {
     // Find current total monthly rates to compute before/after difference in statement log
     const currentEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
     const activeCont = contraturnos.find(c => c.alunoId === alunoId && c.dataFim === null);
-    
-    const previousTotal = (currentEnrollment?.valorFinalRegular || 0) + (activeCont?.valorMensal || 0);
+    const prevRegularClass = currentEnrollment ? (classPrices.find(rc => rc.id === currentEnrollment.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === currentEnrollment.turmaRegularId)) : null;
+    const prevLanche = (currentEnrollment?.adicionarLanche && prevRegularClass?.natureza === 'Fundamental') ? (currentEnrollment.valorLanche || 0) : 0;
+    const previousTotal = (currentEnrollment?.valorFinalRegular || 0) + (activeCont?.valorMensal || 0) + prevLanche;
 
     // 1. Update/Insert Enrollment
     let updatedEnrollment: Enrollment;
@@ -586,7 +587,9 @@ export default function App() {
     }
 
     // 3. Log Financial Statement Movement
-    const newTotal = enrollmentData.valorFinalRegular + (contraturnoData ? contraturnoData.valorMensal : 0);
+    const currentRegularClass = classPrices.find(rc => rc.id === enrollmentData.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === enrollmentData.turmaRegularId);
+    const newLanche = (enrollmentData.adicionarLanche && currentRegularClass?.natureza === 'Fundamental') ? (enrollmentData.valorLanche || 0) : 0;
+    const newTotal = enrollmentData.valorFinalRegular + (contraturnoData ? contraturnoData.valorMensal : 0) + newLanche;
     
     let moveType: FinancialMovement['tipo'] = 'Desconto_Alterado';
     if (contraturnoDescriptionAddon.includes('Ativação') || contraturnoDescriptionAddon.includes('Alteração')) {
@@ -727,7 +730,7 @@ export default function App() {
         // Re-calculate the discount in Reais if the type is percentage, otherwise it remains fixed in Reais
         let finalDiscount = e.descontoMensal;
         if (e.tipoDescontoRegular === 'porcentagem' && e.valorDescontoRegularInput !== undefined) {
-          finalDiscount = Math.round(basePrice * (e.valorDescontoRegularInput / 100));
+          finalDiscount = Number((basePrice * (e.valorDescontoRegularInput / 100)).toFixed(2));
         } else {
           // Cap fixed discount at the new base price
           finalDiscount = Math.min(e.descontoMensal, basePrice);

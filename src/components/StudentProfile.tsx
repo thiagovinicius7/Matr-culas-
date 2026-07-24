@@ -999,11 +999,22 @@ export default function StudentProfile({
                                 <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorLanche || 0)}</span>
                               </div>
                             )}
+                            {e.descontoPontualidade && (
+                              <div className="flex justify-between text-xs text-blue-600 font-medium">
+                                <span>Desconto Pontualidade (3%):</span>
+                                <span className="font-mono">
+                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                    Number(((e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) * 0.03).toFixed(2))
+                                  )}
+                                </span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-xs font-bold text-slate-800 pt-1 border-t border-slate-100">
-                              <span>Valor Final Mensal:</span>
+                              <span>{e.descontoPontualidade ? 'Valor Final Líquido (Até Vencimento):' : 'Valor Final Mensal:'}</span>
                               <span className="font-mono text-slate-900">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                  e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)
+                                  (e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) -
+                                  (e.descontoPontualidade ? Number(((e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) * 0.03).toFixed(2)) : 0)
                                 )}
                               </span>
                             </div>

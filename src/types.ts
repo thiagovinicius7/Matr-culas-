@@ -56,6 +56,7 @@ export interface Enrollment {
   valorDescontoContraturnoInput?: number;
   adicionarLanche?: boolean;
   valorLanche?: number;
+  descontoPontualidade?: boolean;
 }
 
 export interface FinancialMovement {
