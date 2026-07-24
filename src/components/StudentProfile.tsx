@@ -128,11 +128,21 @@ export default function StudentProfile({
     if (!profileRef.current || !activeStudent) return;
     setIsExporting(true);
     try {
-      const dataUrl = await htmlToImage.toPng(profileRef.current, {
+      const element = profileRef.current;
+      // Get the full un-scrolled dimensions of the card
+      const originalWidth = element.scrollWidth;
+      const originalHeight = element.scrollHeight;
+
+      const dataUrl = await htmlToImage.toPng(element, {
         backgroundColor: '#FDFBF7', // match brand-cream perfectly
+        width: originalWidth,
+        height: originalHeight,
         style: {
           padding: '24px',
           borderRadius: '12px',
+          overflow: 'visible',
+          height: 'auto',
+          maxHeight: 'none',
         },
         pixelRatio: 2
       });
@@ -146,6 +156,10 @@ export default function StudentProfile({
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handlePrintFicha = () => {
+    window.print();
   };
 
   // Age calculations
@@ -679,6 +693,13 @@ export default function StudentProfile({
                   >
                     <FileImage size={13} />
                     {isExporting ? 'Gerando Imagem...' : 'Gerar Imagem para Enviar'}
+                  </button>
+                  <button
+                    onClick={handlePrintFicha}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <FileText size={13} />
+                    Salvar em PDF / Imprimir
                   </button>
                 </div>
 

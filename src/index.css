@@ -36,3 +36,64 @@ body {
   background-color: #FCFAF6;
   color: #2D3748;
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide sidebar, headers, footers, action buttons, search lists, scroll elements */
+  #app-sidebar,
+  #sidebar-nav,
+  #mobile-header,
+  header,
+  footer,
+  #student-ficha-root > div:first-child, /* student list sidebar */
+  #student-profile-actions-bar,
+  #student-ficha-root > div:last-child > button:first-child, /* back to list button on mobile */
+  button,
+  form,
+  select {
+    display: none !important;
+  }
+
+  /* Reset container margins for printing */
+  #main-stage, main, .p-6, .py-6, .space-y-6 {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  #student-ficha-root {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  #student-ficha-root > div:last-child {
+    display: block !important;
+    width: 100% !important;
+    grid-column: span 12 / span 12 !important;
+  }
+
+  .bg-white {
+    background-color: white !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  .bg-slate-50, .bg-emerald-50, .bg-blue-50, .bg-orange-50 {
+    background-color: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .text-emerald-800, .text-blue-800, .text-orange-800 {
+    color: black !important;
+  }
+
+  /* Ensure page breaks don't chop boxes halfway */
+  .bg-white, .p-4, .p-5, .rounded-lg {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

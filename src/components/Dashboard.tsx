@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Student, Enrollment, ContraturnoSegment } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
-import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList } from 'lucide-react';
+import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList, Database, RefreshCw, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface DashboardProps {
@@ -60,8 +60,8 @@ export default function Dashboard({
 
   return (
     <div className="space-y-6" id="dashboard-container">
-      {/* Header with quick stats */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Header with quick stats & discrete data management */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-display font-extrabold tracking-tight text-brand-green-dark">
             Painel Principal
@@ -70,9 +70,62 @@ export default function Dashboard({
             Visão geral da comunidade Sítio-escola: alunos, rematrículas e receitas vigentes.
           </p>
         </div>
-        <div className="text-[10px] uppercase tracking-wider font-bold bg-brand-sand text-brand-green-dark px-3 py-1.5 rounded-md border border-slate-200/60 flex items-center gap-2 self-start md:self-auto">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse"></span>
-          Período Letivo: 2026
+        
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+          {/* Status badge */}
+          {students.some(s => s.id.startsWith('student_12')) ? (
+            <span className="px-2.5 py-1.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-md border border-emerald-200/60 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              67 Alunos Reais Sincronizados
+            </span>
+          ) : students.some(s => !s.id.startsWith('student_12')) ? (
+            <span className="px-2.5 py-1.5 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase rounded-md border border-amber-200/60 flex items-center gap-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+              Modo Demonstração (Exemplos)
+            </span>
+          ) : (
+            <span className="px-2.5 py-1.5 bg-slate-50 text-slate-700 text-[10px] font-bold uppercase rounded-md border border-slate-200/60 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              Base Vazia
+            </span>
+          )}
+
+          <div className="text-[10px] uppercase tracking-wider font-bold bg-brand-sand text-brand-green-dark px-3 py-1.5 rounded-md border border-slate-200/60 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse"></span>
+            Período Letivo: 2026
+          </div>
+
+          {/* Discrete Data controls for admin */}
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
+            {students.some(s => !s.id.startsWith('student_12')) && onClearDatabase && (
+              <button
+                onClick={() => {
+                  if (confirm('Tem certeza que deseja apagar todos os alunos cadastrados como exemplo? Isso removerá as 8 fichas fictícias do Firebase.')) {
+                    onClearDatabase();
+                  }
+                }}
+                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md border border-rose-100 hover:border-rose-200 transition-colors cursor-pointer"
+                title="Apagar Alunos de Exemplo"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+
+            {onImportGeraniumData && (
+              <button
+                onClick={onImportGeraniumData}
+                className={`px-2.5 py-1.5 text-[10px] font-bold uppercase rounded-md flex items-center gap-1 transition-colors cursor-pointer border ${
+                  students.some(s => s.id.startsWith('student_12'))
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                    : 'bg-brand-orange text-white border-transparent hover:bg-brand-orange-hover'
+                }`}
+                title={students.some(s => s.id.startsWith('student_12')) ? 'Reimportar Lista Oficial' : 'Importar Lista Oficial de Alunos'}
+              >
+                <Database size={12} />
+                <span>{students.some(s => s.id.startsWith('student_12')) ? 'Reimportar' : 'Importar 67 Alunos Reais'}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -148,84 +201,6 @@ export default function Dashboard({
           </div>
         )}
       </div>
-
-      {/* Ferramenta de Importação e Gestão de Alunos */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-xs"
-        id="data-management-panel"
-      >
-        <div className="bg-brand-green-dark px-4 py-3 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users size={16} className="text-brand-orange stroke-[2.5]" />
-            <span className="font-display font-bold text-xs uppercase tracking-wider">
-              Ferramenta de Importação e Gestão de Alunos
-            </span>
-          </div>
-          <span className="text-[9px] bg-brand-orange text-white px-2.5 py-1 rounded-md font-bold uppercase tracking-wider">
-            Sítio Geranium
-          </span>
-        </div>
-        
-        <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1.5 max-w-2xl">
-            <h4 className="text-sm font-bold text-slate-800 font-display flex flex-wrap items-center gap-2">
-              Controle de Dados da Base de Alunos
-              {students.some(s => s.id.startsWith('student_12')) ? (
-                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-bold uppercase rounded-md tracking-wider">
-                  Sincronizado (67 Alunos Reais)
-                </span>
-              ) : students.some(s => !s.id.startsWith('student_12')) ? (
-                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold uppercase rounded-md tracking-wider animate-pulse">
-                  Modo de Demonstração (Alunos Exemplo)
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[9px] font-bold uppercase rounded-md tracking-wider">
-                  Base de Dados Vazia
-                </span>
-              )}
-            </h4>
-            <p className="text-xs text-slate-600 font-sans leading-relaxed">
-              {students.some(s => s.id.startsWith('student_12')) ? (
-                <span>Sua base de dados do Firebase está sincronizada com os <strong>67 alunos ativos</strong> importados do Relatório de Turmas oficial do Sítio-Escola Geranium. Todas as colmeias, responsáveis e contraturnos estão cadastrados em tempo real.</span>
-              ) : students.some(s => !s.id.startsWith('student_12')) ? (
-                <span>A base de dados possui alunos de exemplo pré-cadastrados para demonstração. Para utilizar o sistema com a base real do Sítio-Escola Geranium, <strong>apague os alunos de exemplo</strong> e importe a lista oficial com os 67 alunos reais.</span>
-              ) : (
-                <span>O banco de dados do Firebase está limpo e vazio. Clique no botão ao lado para realizar a importação automática de toda a base de <strong>67 alunos oficiais</strong> com seus respectivos responsáveis e turmas.</span>
-              )}
-            </p>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 shrink-0">
-            {students.some(s => !s.id.startsWith('student_12')) && onClearDatabase && (
-              <button
-                onClick={() => {
-                  if (confirm('Tem certeza que deseja apagar todos os alunos cadastrados como exemplo? Isso removerá as 8 fichas fictícias do Firebase.')) {
-                    onClearDatabase();
-                  }
-                }}
-                className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold rounded-lg border border-red-200/60 transition-colors cursor-pointer uppercase tracking-wider font-display"
-              >
-                Apagar Exemplos
-              </button>
-            )}
-            
-            {onImportGeraniumData && (
-              <button
-                onClick={onImportGeraniumData}
-                className={`py-2 px-4 text-white text-[11px] font-bold rounded-lg shadow-xs hover:shadow-md transition-all cursor-pointer uppercase tracking-wider font-display ${
-                  students.some(s => s.id.startsWith('student_12'))
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-brand-orange hover:bg-brand-orange-hover'
-                }`}
-              >
-                {students.some(s => s.id.startsWith('student_12')) ? 'Reimportar Lista' : 'Importar 67 Alunos Reais'}
-              </button>
-            )}
-          </div>
-        </div>
-      </motion.div>
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-grid font-display">

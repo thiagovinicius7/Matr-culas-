@@ -623,11 +623,24 @@ export default function App() {
 
   // Handler: Save global pricing configurations
   const handleSavePrices = async (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[]) => {
+    // Detect deleted classes
+    const currentClassIds = classPrices.map(c => c.id);
+    const updatedClassIds = updatedClasses.map(c => c.id);
+    const deletedClassIds = currentClassIds.filter(id => !updatedClassIds.includes(id));
+
+    // Detect deleted contraturno frequencies
+    const currentContraturnoIds = contraturnoPrices.map(cp => cp.id);
+    const updatedContraturnoIds = updatedContraturno.map(cp => cp.id);
+    const deletedContraturnoIds = currentContraturnoIds.filter(id => !updatedContraturnoIds.includes(id));
+
     setClassPrices(updatedClasses);
     setContraturnoPrices(updatedContraturno);
+
     await Promise.all([
       ...updatedClasses.map(c => saveDocument('classPrices', c)),
-      ...updatedContraturno.map(cp => saveDocument('contraturnoPrices', cp))
+      ...updatedContraturno.map(cp => saveDocument('contraturnoPrices', cp)),
+      ...deletedClassIds.map(id => deleteDocument('classPrices', id)),
+      ...deletedContraturnoIds.map(id => deleteDocument('contraturnoPrices', id))
     ]);
 
     // Create a financial movement log
@@ -845,6 +858,7 @@ export default function App() {
                   classPrices={classPrices}
                   selectedStudentId={selectedStudentId}
                   onSelectStudent={setSelectedStudentId}
+                  onNavigateWithStudent={handleNavigateWithStudent}
                   onAddStudent={handleAddStudent}
                   onUpdateStudent={handleUpdateStudent}
                   onDeleteStudent={handleDeleteStudent}
