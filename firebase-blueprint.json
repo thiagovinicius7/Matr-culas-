@@ -75,6 +75,33 @@
         "valorNovo": { "type": "number" }
       },
       "required": ["id", "alunoId", "data", "tipo", "descricao", "valorAnterior", "valorNovo"]
+    },
+    "RegularClass": {
+      "title": "RegularClass",
+      "description": "Pricing configuration for a regular school class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "natureza": { "type": "string" },
+        "idadeRef": { "type": "integer" },
+        "valorMensal": { "type": "number" },
+        "ano": { "type": "integer" }
+      },
+      "required": ["id", "nome", "natureza", "idadeRef", "valorMensal"]
+    },
+    "ContraturnoPrice": {
+      "title": "ContraturnoPrice",
+      "description": "Pricing configuration for contraturno based on weekly frequency",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "frequencia": { "type": "integer" },
+        "valorParcial": { "type": "number" },
+        "valorCompleto": { "type": "number" },
+        "ano": { "type": "integer" }
+      },
+      "required": ["id", "frequencia", "valorParcial", "valorCompleto"]
     }
   },
   "firestore": {
@@ -97,6 +124,14 @@
     "movements/{movementId}": {
       "schema": "FinancialMovement",
       "description": "Collection of logging or transaction updates"
+    },
+    "classPrices/{classPriceId}": {
+      "schema": "RegularClass",
+      "description": "Collection of custom regular class prices"
+    },
+    "contraturnoPrices/{contraturnoPriceId}": {
+      "schema": "ContraturnoPrice",
+      "description": "Collection of custom contraturno prices"
     }
   }
 }

@@ -78,6 +78,27 @@ service cloud.firestore {
         && (data.valorNovo is int || data.valorNovo is float);
     }
 
+    function isValidRegularClass(data) {
+      return data.keys().hasAll(['id', 'nome', 'natureza', 'idadeRef', 'valorMensal'])
+        && (data.keys().size() == 5 || (data.keys().size() == 6 && data.keys().hasAll(['ano'])))
+        && data.id is string && data.id.size() <= 128
+        && data.nome is string && data.nome.size() <= 100
+        && (data.natureza == 'Infantil' || data.natureza == 'Fundamental')
+        && data.idadeRef is int
+        && (data.valorMensal is int || data.valorMensal is float)
+        && (!data.keys().hasAll(['ano']) || data.ano is int);
+    }
+
+    function isValidContraturnoPrice(data) {
+      return data.keys().hasAll(['id', 'frequencia', 'valorParcial', 'valorCompleto'])
+        && (data.keys().size() == 4 || (data.keys().size() == 5 && data.keys().hasAll(['ano'])))
+        && data.id is string && data.id.size() <= 128
+        && data.frequencia is int
+        && (data.valorParcial is int || data.valorParcial is float)
+        && (data.valorCompleto is int || data.valorCompleto is float)
+        && (!data.keys().hasAll(['ano']) || data.ano is int);
+    }
+
     // Rules for each collection
     match /students/{studentId} {
       allow read: if true;
@@ -112,6 +133,20 @@ service cloud.firestore {
       allow create: if isValidId(movementId) && isValidFinancialMovement(incoming());
       allow update: if isValidId(movementId) && isValidFinancialMovement(incoming());
       allow delete: if isValidId(movementId);
+    }
+
+    match /classPrices/{classPriceId} {
+      allow read: if true;
+      allow create: if isValidId(classPriceId) && isValidRegularClass(incoming());
+      allow update: if isValidId(classPriceId) && isValidRegularClass(incoming());
+      allow delete: if isValidId(classPriceId);
+    }
+
+    match /contraturnoPrices/{contraturnoPriceId} {
+      allow read: if true;
+      allow create: if isValidId(contraturnoPriceId) && isValidContraturnoPrice(incoming());
+      allow update: if isValidId(contraturnoPriceId) && isValidContraturnoPrice(incoming());
+      allow delete: if isValidId(contraturnoPriceId);
     }
 
     match /test/{testId} {
