@@ -47,6 +47,9 @@ export default function NegotiationCalc({
   const [contraturnoDiscountType, setContraturnoDiscountType] = useState<'reais' | 'porcentagem'>('reais');
   const [contraturnoDiscountInput, setContraturnoDiscountInput] = useState<number>(0);
 
+  const [addLanche, setAddLanche] = useState<boolean>(false);
+  const [lancheValue, setLancheValue] = useState<number>(200);
+
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
 
@@ -106,7 +109,7 @@ export default function NegotiationCalc({
 
   const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
 
-  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted;
+  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted + (addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0);
 
   // Auto-fill existing negotiation if student changes or selected year changes
   useEffect(() => {
@@ -119,6 +122,8 @@ export default function NegotiationCalc({
         setContraturnoDiscountInput(existing.valorDescontoContraturnoInput !== undefined ? existing.valorDescontoContraturnoInput : existing.descontoContraturno || 0);
         setNegotiationStatus(existing.statusNegociacao);
         setNotes(existing.anotacoes);
+        setAddLanche(existing.adicionarLanche !== undefined ? existing.adicionarLanche : false);
+        setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 200);
       } else {
         setDiscountType('reais');
         setDiscountInput(0);
@@ -126,6 +131,8 @@ export default function NegotiationCalc({
         setContraturnoDiscountInput(0);
         setNegotiationStatus('Em Negociação');
         setNotes('');
+        setAddLanche(false);
+        setLancheValue(200);
       }
 
       // Check for active contraturno for this student
@@ -169,7 +176,9 @@ export default function NegotiationCalc({
       tipoDescontoRegular: discountType,
       valorDescontoRegularInput: discountInput,
       tipoDescontoContraturno: contraturnoDiscountType,
-      valorDescontoContraturnoInput: contraturnoDiscountInput
+      valorDescontoContraturnoInput: contraturnoDiscountInput,
+      adicionarLanche: addLanche && regularClass?.natureza === 'Fundamental',
+      valorLanche: addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0
     };
 
     const contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null = enableContraturno && weeklyFrequency > 0 ? {
@@ -259,6 +268,45 @@ export default function NegotiationCalc({
                     </span>
                   </div>
                 </div>
+
+                {/* Option to add snack fee for Fundamental class */}
+                {regularClass?.natureza === 'Fundamental' && (
+                  <div className="p-3 bg-orange-50/60 rounded-lg border border-orange-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="add-lanche"
+                        checked={addLanche}
+                        onChange={(e) => {
+                          setAddLanche(e.target.checked);
+                          if (e.target.checked && !lancheValue) {
+                            setLancheValue(200);
+                          }
+                        }}
+                        className="w-4 h-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor="add-lanche" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                        Acrescentar Valor do Lanche (R$ 200,00)
+                      </label>
+                    </div>
+                    {addLanche && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Valor do Lanche:</span>
+                        <div className="relative w-28">
+                          <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-mono">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lancheValue || ''}
+                            onChange={(e) => setLancheValue(Number(e.target.value))}
+                            className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-slate-200 focus:border-orange-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
+                            placeholder="200"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Discount and negotiation settings */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -537,6 +585,16 @@ export default function NegotiationCalc({
                     </span>
                   </div>
 
+                  {/* Lanche for Fundamental */}
+                  {addLanche && regularClass?.natureza === 'Fundamental' && (
+                    <div className="flex justify-between text-xs text-slate-700 pt-1 border-t border-dashed border-slate-100">
+                      <span className="text-orange-700 font-medium">Adicional de Lanche (Fundamental):</span>
+                      <span className="font-mono text-slate-800 font-bold">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lancheValue)}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Contraturno */}
                   {enableContraturno && weeklyFrequency > 0 && (
                     <div className="pt-1 border-t border-dashed border-slate-100 space-y-1">
@@ -574,7 +632,7 @@ export default function NegotiationCalc({
                     <span className="text-[10px] text-orange-300">/mês</span>
                   </div>
                   <p className="text-[9px] text-emerald-300 pt-1 border-t border-emerald-900">
-                    Soma de Ensino Regular (com desconto) + Contraturno.
+                    Soma de Ensino Regular (com desconto) + Contraturno{(addLanche && regularClass?.natureza === 'Fundamental') ? ' + Lanche' : ''}.
                   </p>
                 </div>
 

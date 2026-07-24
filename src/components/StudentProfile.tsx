@@ -993,9 +993,19 @@ export default function StudentProfile({
                               <span>Desconto Negociado:</span>
                               <span className="font-mono">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.descontoMensal)}</span>
                             </div>
+                            {e.adicionarLanche && regularClass?.natureza === 'Fundamental' && (
+                              <div className="flex justify-between text-xs text-orange-600 font-medium">
+                                <span>Adicional Lanche (Fundamental):</span>
+                                <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorLanche || 0)}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-xs font-bold text-slate-800 pt-1 border-t border-slate-100">
                               <span>Valor Final Mensal:</span>
-                              <span className="font-mono text-slate-900">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorFinalRegular)}</span>
+                              <span className="font-mono text-slate-900">
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                  e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)
+                                )}
+                              </span>
                             </div>
                           </div>
 

@@ -54,6 +54,8 @@ export interface Enrollment {
   valorDescontoRegularInput?: number;
   tipoDescontoContraturno?: 'reais' | 'porcentagem';
   valorDescontoContraturnoInput?: number;
+  adicionarLanche?: boolean;
+  valorLanche?: number;
 }
 
 export interface FinancialMovement {

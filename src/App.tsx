@@ -625,7 +625,9 @@ export default function App() {
     const student = students.find(s => s.id === alunoId);
     if (currentEnroll && student) {
       const activeCont = contraturnos.find(c => c.alunoId === alunoId && c.dataFim === null);
-      const totalRate = currentEnroll.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0);
+      const regularClass = classPrices.find(rc => rc.id === currentEnroll.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === currentEnroll.turmaRegularId);
+      const lancheVal = (currentEnroll.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (currentEnroll.valorLanche || 0) : 0;
+      const totalRate = currentEnroll.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0) + lancheVal;
 
       const movement: FinancialMovement = {
         id: `mov_${Date.now()}`,

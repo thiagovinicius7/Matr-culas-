@@ -43,7 +43,11 @@ export default function Dashboard({
   // Monthly Revenue Estimate
   const regularRevenue = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
-    .reduce((sum, e) => sum + e.valorFinalRegular, 0);
+    .reduce((sum, e) => {
+      const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+      const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
+      return sum + e.valorFinalRegular + lancheVal;
+    }, 0);
 
   const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
   const contraturnoRevenue = activeContraturnos.reduce((sum, c) => sum + c.valorMensal, 0);

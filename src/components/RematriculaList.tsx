@@ -68,7 +68,8 @@ export default function RematriculaList({
     
     // Check if they have an active contraturno
     const activeCont = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
-    const totalNegotiatedMonthly = e.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0);
+    const lanchePrice = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
+    const totalNegotiatedMonthly = e.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0) + lanchePrice;
 
     return {
       enrollment: e,
@@ -324,6 +325,12 @@ export default function RematriculaList({
                             <div className="flex justify-between max-w-[150px] text-[10px] text-rose-500">
                               <span>Desc. Contraturno:</span>
                               <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.descontoContraturno || 0)}</span>
+                            </div>
+                          )}
+                          {enrollment.adicionarLanche && regularClass?.natureza === 'Fundamental' && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-orange-600 font-medium">
+                              <span>Adicional Lanche:</span>
+                              <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.valorLanche || 0)}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-center max-w-[150px] font-bold text-slate-900 text-xs">
