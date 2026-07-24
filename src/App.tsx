@@ -87,7 +87,8 @@ export default function App() {
 
         // Process and seed custom Class Prices
         let finalClassPrices = loadedClassPrices;
-        if (!finalClassPrices || finalClassPrices.length === 0) {
+        const needsClassPricingSeed = !finalClassPrices || finalClassPrices.length === 0 || finalClassPrices.some(cp => cp.id === 'mirim_1' && cp.valorMensal === 1600);
+        if (needsClassPricingSeed) {
           finalClassPrices = [...REGULAR_CLASSES];
           await Promise.all(finalClassPrices.map(cp => saveDocument('classPrices', cp)));
         }
@@ -95,14 +96,15 @@ export default function App() {
 
         // Process and seed custom Contraturno Prices
         let finalContraturnoPrices = loadedContraturnoPrices;
-        if (!finalContraturnoPrices || finalContraturnoPrices.length === 0) {
+        const needsContraturnoPricingSeed = !finalContraturnoPrices || finalContraturnoPrices.length === 0 || finalContraturnoPrices.some(ctp => ctp.id === 'freq_1' && ctp.valorCompleto === 500);
+        if (needsContraturnoPricingSeed) {
           finalContraturnoPrices = [
-            { id: 'avulso', frequencia: 0, valorParcial: 80, valorCompleto: 130 },
-            { id: 'freq_1', frequencia: 1, valorParcial: 300, valorCompleto: 500 },
-            { id: 'freq_2', frequencia: 2, valorParcial: 550, valorCompleto: 900 },
-            { id: 'freq_3', frequencia: 3, valorParcial: 750, valorCompleto: 1250 },
-            { id: 'freq_4', frequencia: 4, valorParcial: 950, valorCompleto: 1550 },
-            { id: 'freq_5', frequencia: 5, valorParcial: 1100, valorCompleto: 1800 }
+            { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120 },
+            { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260 },
+            { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520 },
+            { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690 },
+            { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5 },
+            { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035 }
           ];
           await Promise.all(finalContraturnoPrices.map(ctp => saveDocument('contraturnoPrices', ctp)));
         }
@@ -155,50 +157,179 @@ export default function App() {
   // Handler: Import full Sítio-Escola Geranium Student Report Data
   const handleImportGeraniumData = async () => {
     const confirmado = window.confirm(
-      'Importar o Relatório de Turmas vai APAGAR todos os alunos, responsáveis, matrículas e ' +
-      'contraturnos cadastrados atualmente e substituir pelos dados do relatório. Essa ação não ' +
-      'pode ser desfeita. Deseja continuar?'
+      'Deseja importar a lista de alunos do Sítio-Escola Geranium? ' +
+      'O sistema irá comparar com os cadastros atuais, atualizando os registros existentes e ' +
+      'adicionando os novos de forma inteligente sem duplicar ou apagar as negociações em andamento.'
     );
     if (!confirmado) return;
 
     try {
       setLoading(true);
-      
-      // Clean start: remove any existing mock or previous students
-      await clearAllDatabaseCollections();
 
-      const guardiansList = getImportedGuardians();
-      const enrollmentsList = getImportedEnrollments();
-      const contraturnosList = getImportedContraturnos();
+      const importedGuardiansList = getImportedGuardians();
+      const importedEnrollmentsList = getImportedEnrollments();
+      const importedContraturnosList = getImportedContraturnos();
 
-      // Save all documents in parallel to Firestore
+      const updatedStudents: Student[] = [...students];
+      const updatedGuardians: Guardian[] = [...guardians];
+      const updatedEnrollments: Enrollment[] = [...enrollments];
+      const updatedContraturnos: ContraturnoSegment[] = [...contraturnos];
+
+      const studentsToSave: Student[] = [];
+      const guardiansToSave: Guardian[] = [];
+      const enrollmentsToSave: Enrollment[] = [];
+      const contraturnosToSave: ContraturnoSegment[] = [];
+
+      for (const importedStudent of IMPORTED_STUDENTS) {
+        // Match existing student by exact ID or exact name (case-insensitive)
+        const matchByName = updatedStudents.find(s => s.nome.trim().toLowerCase() === importedStudent.nome.trim().toLowerCase());
+        const matchById = updatedStudents.find(s => s.id === importedStudent.id);
+        const existingStudent = matchById || matchByName;
+
+        let finalStudentId = importedStudent.id;
+        let mergedStudent: Student;
+
+        if (existingStudent) {
+          finalStudentId = existingStudent.id;
+          mergedStudent = {
+            ...existingStudent,
+            ...importedStudent,
+            id: finalStudentId,
+            status: existingStudent.status || importedStudent.status || 'ativo'
+          };
+          const idx = updatedStudents.findIndex(s => s.id === finalStudentId);
+          if (idx !== -1) {
+            updatedStudents[idx] = mergedStudent;
+          } else {
+            updatedStudents.push(mergedStudent);
+          }
+        } else {
+          mergedStudent = { ...importedStudent, status: 'ativo' };
+          updatedStudents.push(mergedStudent);
+        }
+        studentsToSave.push(mergedStudent);
+
+        // Merge Guardians
+        const guardiansForThisStudent = importedGuardiansList.filter(g => g.alunoId === importedStudent.id);
+        for (const importedGuardian of guardiansForThisStudent) {
+          const existingGuardian = updatedGuardians.find(exG => 
+            exG.id === importedGuardian.id || 
+            (exG.alunoId === finalStudentId && exG.nome.trim().toLowerCase() === importedGuardian.nome.trim().toLowerCase())
+          );
+
+          let mergedGuardian: Guardian;
+          if (existingGuardian) {
+            mergedGuardian = {
+              ...existingGuardian,
+              ...importedGuardian,
+              id: existingGuardian.id,
+              alunoId: finalStudentId
+            };
+            const idx = updatedGuardians.findIndex(g => g.id === existingGuardian.id);
+            if (idx !== -1) {
+              updatedGuardians[idx] = mergedGuardian;
+            } else {
+              updatedGuardians.push(mergedGuardian);
+            }
+          } else {
+            mergedGuardian = {
+              ...importedGuardian,
+              alunoId: finalStudentId
+            };
+            updatedGuardians.push(mergedGuardian);
+          }
+          guardiansToSave.push(mergedGuardian);
+        }
+
+        // Merge Enrollment for 2026
+        const importedEnrollment = importedEnrollmentsList.find(e => e.alunoId === importedStudent.id && e.ano === 2026);
+        if (importedEnrollment) {
+          const existingEnrollment = updatedEnrollments.find(exE => exE.alunoId === finalStudentId && exE.ano === 2026);
+          let mergedEnrollment: Enrollment;
+
+          if (existingEnrollment) {
+            mergedEnrollment = {
+              ...importedEnrollment,
+              ...existingEnrollment, // preserve active negotiation states, discounts, and annotations
+              id: existingEnrollment.id,
+              alunoId: finalStudentId
+            };
+            const idx = updatedEnrollments.findIndex(e => e.id === existingEnrollment.id);
+            if (idx !== -1) {
+              updatedEnrollments[idx] = mergedEnrollment;
+            } else {
+              updatedEnrollments.push(mergedEnrollment);
+            }
+          } else {
+            mergedEnrollment = {
+              ...importedEnrollment,
+              alunoId: finalStudentId
+            };
+            updatedEnrollments.push(mergedEnrollment);
+          }
+          enrollmentsToSave.push(mergedEnrollment);
+        }
+
+        // Merge Contraturno
+        const importedContraturno = importedContraturnosList.find(c => c.alunoId === importedStudent.id);
+        if (importedContraturno) {
+          const existingContraturno = updatedContraturnos.find(exC => exC.alunoId === finalStudentId && exC.dataFim === null);
+          let mergedContraturno: ContraturnoSegment;
+
+          if (existingContraturno) {
+            mergedContraturno = {
+              ...importedContraturno,
+              ...existingContraturno, // preserve active contraturno segments, schedules and custom values
+              id: existingContraturno.id,
+              alunoId: finalStudentId
+            };
+            const idx = updatedContraturnos.findIndex(c => c.id === existingContraturno.id);
+            if (idx !== -1) {
+              updatedContraturnos[idx] = mergedContraturno;
+            } else {
+              updatedContraturnos.push(mergedContraturno);
+            }
+          } else {
+            mergedContraturno = {
+              ...importedContraturno,
+              alunoId: finalStudentId
+            };
+            updatedContraturnos.push(mergedContraturno);
+          }
+          contraturnosToSave.push(mergedContraturno);
+        }
+      }
+
+      // Save to Firestore in parallel
       await Promise.all([
-        ...IMPORTED_STUDENTS.map(s => saveDocument('students', s)),
-        ...guardiansList.map(g => saveDocument('guardians', g)),
-        ...enrollmentsList.map(e => saveDocument('enrollments', e)),
-        ...contraturnosList.map(c => saveDocument('contraturnos', c))
+        ...studentsToSave.map(s => saveDocument('students', s)),
+        ...guardiansToSave.map(g => saveDocument('guardians', g)),
+        ...enrollmentsToSave.map(e => saveDocument('enrollments', e)),
+        ...contraturnosToSave.map(c => saveDocument('contraturnos', c))
       ]);
 
       window.alert(
-        'Importação concluída: ' + IMPORTED_STUDENTS.length + ' alunos, ' +
-        guardiansList.length + ' responsáveis, ' + enrollmentsList.length + ' matrículas e ' +
-        contraturnosList.length + ' contraturnos carregados.'
+        'Sincronização concluída com sucesso!\n' +
+        'Alunos processados: ' + studentsToSave.length + '\n' +
+        'As informações foram atualizadas e os acordos financeiros em andamento foram preservados.'
       );
 
-      const sortedImported = [...IMPORTED_STUDENTS].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-      // Set local state to the clean imported dataset only
-      setStudents(sortedImported);
-      setGuardians(guardiansList);
-      setEnrollments(enrollmentsList);
-      setContraturnos(contraturnosList);
-      setMovements([]);
-      if (sortedImported.length > 0) {
-        setSelectedStudentId(sortedImported[0].id);
+      const sortedStudents = [...updatedStudents].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      setStudents(sortedStudents);
+      setGuardians(updatedGuardians);
+      setEnrollments(updatedEnrollments);
+      setContraturnos(updatedContraturnos);
+
+      if (sortedStudents.length > 0) {
+        // If the selected student is not in the list anymore (deleted), select the first one
+        if (!sortedStudents.some(s => s.id === selectedStudentId)) {
+          setSelectedStudentId(sortedStudents[0].id);
+        }
       }
 
     } catch (error) {
-      console.error('Error importing Geranium data:', error);
-      window.alert('A importação falhou. Nada foi apagado. Detalhe do erro no console (F12).');
+      console.error('Error merging Geranium data:', error);
+      window.alert('A importação falhou. Detalhes no console (F12).');
     } finally {
       setLoading(false);
     }

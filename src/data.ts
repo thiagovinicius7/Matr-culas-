@@ -2,15 +2,15 @@ import { Student, Guardian, RegularClass, ContraturnoSegment, Enrollment, Financ
 
 // Catalog of Regular Classes (Bee names theme - Sítio-escola native stingless bees)
 export const REGULAR_CLASSES: RegularClass[] = [
-  { id: 'mirim_1', nome: 'Mirim 1', natureza: 'Infantil', idadeRef: 2, valorMensal: 1600 },
-  { id: 'mirim_2', nome: 'Mirim 2', natureza: 'Infantil', idadeRef: 3, valorMensal: 1700 },
-  { id: 'mandacaia_1', nome: 'Mandaçaia 1', natureza: 'Infantil', idadeRef: 4, valorMensal: 1800 },
-  { id: 'mandacaia_2', nome: 'Mandaçaia 2', natureza: 'Infantil', idadeRef: 5, valorMensal: 1900 },
-  { id: 'jatai', nome: 'Jataí', natureza: 'Fundamental', idadeRef: 6, valorMensal: 2100 },
-  { id: 'urucu', nome: 'Uruçu', natureza: 'Fundamental', idadeRef: 7, valorMensal: 2200 },
-  { id: 'irai', nome: 'Iraí', natureza: 'Fundamental', idadeRef: 8, valorMensal: 2300 },
-  { id: 'abelha_branca', nome: 'Abelha Branca', natureza: 'Fundamental', idadeRef: 9, valorMensal: 2400 },
-  { id: 'benjoi', nome: 'Benjoí', natureza: 'Fundamental', idadeRef: 10, valorMensal: 2500 }
+  { id: 'mirim_1', nome: 'Mirim 1', natureza: 'Infantil', idadeRef: 2, valorMensal: 1970 },
+  { id: 'mirim_2', nome: 'Mirim 2', natureza: 'Infantil', idadeRef: 3, valorMensal: 1970 },
+  { id: 'mandacaia_1', nome: 'Mandaçaia 1', natureza: 'Infantil', idadeRef: 4, valorMensal: 1870 },
+  { id: 'mandacaia_2', nome: 'Mandaçaia 2', natureza: 'Infantil', idadeRef: 5, valorMensal: 1870 },
+  { id: 'jatai', nome: 'Jataí', natureza: 'Fundamental', idadeRef: 6, valorMensal: 1380 },
+  { id: 'urucu', nome: 'Uruçu', natureza: 'Fundamental', idadeRef: 7, valorMensal: 1380 },
+  { id: 'irai', nome: 'Iraí', natureza: 'Fundamental', idadeRef: 8, valorMensal: 1380 },
+  { id: 'abelha_branca', nome: 'Abelha Branca', natureza: 'Fundamental', idadeRef: 9, valorMensal: 1380 },
+  { id: 'benjoi', nome: 'Benjoí', natureza: 'Fundamental', idadeRef: 10, valorMensal: 1380 }
 ];
 
 // Helper to calculate student age at March 31 of enrollment year
@@ -51,15 +51,15 @@ export function getRegularClassForAge(age: number): RegularClass {
 // Get Contraturno monthly base price or daily fee (avulso)
 export function getContraturnoPrice(frequencia: number, periodo: 'Parcial' | 'Completo'): number {
   if (frequencia === 0) { // Avulso price (per unit)
-    return periodo === 'Parcial' ? 80 : 130;
+    return periodo === 'Parcial' ? 100 : 120;
   }
   
   const pricingTable: Record<number, { Parcial: number; Completo: number }> = {
-    1: { Parcial: 300, Completo: 500 },
-    2: { Parcial: 550, Completo: 900 },
-    3: { Parcial: 750, Completo: 1250 },
-    4: { Parcial: 950, Completo: 1550 },
-    5: { Parcial: 1100, Completo: 1800 }
+    1: { Parcial: 220, Completo: 260 },
+    2: { Parcial: 460, Completo: 520 },
+    3: { Parcial: 630, Completo: 690 },
+    4: { Parcial: 775, Completo: 862.5 },
+    5: { Parcial: 920, Completo: 1035 }
   };
   
   return pricingTable[frequencia]?.[periodo] || 0;

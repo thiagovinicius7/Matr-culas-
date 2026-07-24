@@ -91,12 +91,12 @@ export default function PricingSettings({
   const handleRestoreDefaults = () => {
     if (confirm('Deseja restaurar todos os valores para os padrões originais do Sítio Geranium? Isso substituirá as edições atuais.')) {
       const defaultContraturno: ContraturnoPrice[] = [
-        { id: 'avulso', frequencia: 0, valorParcial: 80, valorCompleto: 130 },
-        { id: 'freq_1', frequencia: 1, valorParcial: 300, valorCompleto: 500 },
-        { id: 'freq_2', frequencia: 2, valorParcial: 550, valorCompleto: 900 },
-        { id: 'freq_3', frequencia: 3, valorParcial: 750, valorCompleto: 1250 },
-        { id: 'freq_4', frequencia: 4, valorParcial: 950, valorCompleto: 1550 },
-        { id: 'freq_5', frequencia: 5, valorParcial: 1100, valorCompleto: 1800 }
+        { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120 },
+        { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260 },
+        { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520 },
+        { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690 },
+        { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5 },
+        { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035 }
       ];
       setLocalClasses([...REGULAR_CLASSES]);
       setLocalContraturno(defaultContraturno);
