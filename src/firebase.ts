@@ -16,6 +16,12 @@ import {
   INITIAL_CONTRATURNO_SEGMENTS, 
   INITIAL_FINANCIAL_MOVEMENTS 
 } from './data';
+import {
+  IMPORTED_STUDENTS,
+  getImportedGuardians,
+  getImportedEnrollments,
+  getImportedContraturnos
+} from './importedStudents';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase with the custom database ID and enable long polling
@@ -69,10 +75,66 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 }
 
 /**
- * Checks if the Firestore database is empty. We no longer seed mock data automatically.
+ * Checks if the Firestore database is empty or has old mock data. If so, automatically
+ * seeds it with the 67 real students from the Sítio-Escola Geranium dataset.
  */
 export async function seedDatabaseIfEmpty() {
-  console.log('Automatic mock seeding is disabled. Database will start empty.');
+  const studentsRef = collection(db, 'students');
+  let studentsSnap;
+  try {
+    studentsSnap = await getDocs(studentsRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, 'students');
+  }
+
+  // We seed if it is empty OR if it contains the old mock student "student_1"
+  const needsSeeding = studentsSnap.empty || studentsSnap.docs.some(d => d.id === 'student_1');
+  
+  if (!needsSeeding) {
+    console.log('Database already populated with official Sítio Geranium data. Skipping seed.');
+    return;
+  }
+  
+  console.log('Firestore needs initial seed. Cleaning up and automatically seeding the 67 real Sítio-Escola Geranium students...');
+  
+  // Clean first to prevent mixed mock/real data
+  await clearAllDatabaseCollections();
+
+  const batch = writeBatch(db);
+
+  // 1. Seed Students
+  IMPORTED_STUDENTS.forEach((student) => {
+    const docRef = doc(db, 'students', student.id);
+    batch.set(docRef, student);
+  });
+
+  // 2. Seed Guardians
+  const guardiansList = getImportedGuardians();
+  guardiansList.forEach((guardian) => {
+    const docRef = doc(db, 'guardians', guardian.id);
+    batch.set(docRef, guardian);
+  });
+
+  // 3. Seed Enrollments
+  const enrollmentsList = getImportedEnrollments();
+  enrollmentsList.forEach((enrollment) => {
+    const docRef = doc(db, 'enrollments', enrollment.id);
+    batch.set(docRef, enrollment);
+  });
+
+  // 4. Seed Contraturnos
+  const contraturnosList = getImportedContraturnos();
+  contraturnosList.forEach((segment) => {
+    const docRef = doc(db, 'contraturnos', segment.id);
+    batch.set(docRef, segment);
+  });
+
+  try {
+    await batch.commit();
+    console.log('Automatic seeding of 67 real Sítio Geranium students completed successfully!');
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'batch_automatic_seed');
+  }
 }
 
 /**
