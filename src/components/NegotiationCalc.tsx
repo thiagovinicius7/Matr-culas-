@@ -40,8 +40,12 @@ export default function NegotiationCalc({
   }, [propSelectedStudentId]);
   
   // Negotiation states
-  const [discountVal, setDiscountVal] = useState<number>(0);
-  const [contraturnoDiscountVal, setContraturnoDiscountVal] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'reais' | 'porcentagem'>('reais');
+  const [discountInput, setDiscountInput] = useState<number>(0);
+
+  const [contraturnoDiscountType, setContraturnoDiscountType] = useState<'reais' | 'porcentagem'>('reais');
+  const [contraturnoDiscountInput, setContraturnoDiscountInput] = useState<number>(0);
+
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
 
@@ -58,7 +62,15 @@ export default function NegotiationCalc({
   const financialGuardian = guardians.find(g => g.alunoId === selectedStudentId && g.financeiro);
 
   const studentAge = selectedStudent ? calculateAgeAtCutoff(selectedStudent.nascimento, 2026) : 0;
-  const regularClass = selectedStudent ? getRegularClassForAgeDynamic(studentAge, classPrices) : null;
+  
+  // Try to find the enrollment's existing class override first, otherwise fall back to age cut-off suggestion
+  const existingEnrollment = selectedStudent ? enrollments.find(e => e.alunoId === selectedStudent.id && e.ano === 2026) : null;
+  const currentTurmaRegularId = existingEnrollment ? existingEnrollment.turmaRegularId : null;
+  const regularClass = selectedStudent 
+    ? (currentTurmaRegularId 
+        ? (classPrices.find(c => c.id === currentTurmaRegularId) || getRegularClassForAgeDynamic(studentAge, classPrices)) 
+        : getRegularClassForAgeDynamic(studentAge, classPrices)) 
+    : null;
 
   // Derive contraturno nature based on student age
   // "Melaço até 4 anos, Marmelada acima de 5 anos"
@@ -66,10 +78,22 @@ export default function NegotiationCalc({
 
   // Pricing calculations
   const regularBasePrice = regularClass ? regularClass.valorMensal : 0;
+
+  // Calculate discount value in Reais
+  const discountVal = discountType === 'porcentagem'
+    ? Math.round(regularBasePrice * (discountInput / 100))
+    : discountInput;
+
   const regularWithDiscount = Math.max(0, regularBasePrice - discountVal);
 
   const weeklyFrequency = selectedDays.length;
   const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices) : 0;
+
+  // Calculate contraturno discount value in Reais
+  const contraturnoDiscountVal = contraturnoDiscountType === 'porcentagem'
+    ? Math.round(contraturnoPrice * (contraturnoDiscountInput / 100))
+    : contraturnoDiscountInput;
+
   const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
 
   const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted;
@@ -79,13 +103,17 @@ export default function NegotiationCalc({
     if (selectedStudentId) {
       const existing = enrollments.find(e => e.alunoId === selectedStudentId);
       if (existing) {
-        setDiscountVal(existing.descontoMensal);
-        setContraturnoDiscountVal(existing.descontoContraturno || 0);
+        setDiscountType(existing.tipoDescontoRegular || 'reais');
+        setDiscountInput(existing.valorDescontoRegularInput !== undefined ? existing.valorDescontoRegularInput : existing.descontoMensal);
+        setContraturnoDiscountType(existing.tipoDescontoContraturno || 'reais');
+        setContraturnoDiscountInput(existing.valorDescontoContraturnoInput !== undefined ? existing.valorDescontoContraturnoInput : existing.descontoContraturno || 0);
         setNegotiationStatus(existing.statusNegociacao);
         setNotes(existing.anotacoes);
       } else {
-        setDiscountVal(0);
-        setContraturnoDiscountVal(0);
+        setDiscountType('reais');
+        setDiscountInput(0);
+        setContraturnoDiscountType('reais');
+        setContraturnoDiscountInput(0);
         setNegotiationStatus('Em Negociação');
         setNotes('');
       }
@@ -127,7 +155,11 @@ export default function NegotiationCalc({
       valorFinalRegular: regularWithDiscount,
       statusNegociacao: negotiationStatus,
       anotacoes: notes,
-      descontoContraturno: contraturnoDiscountVal
+      descontoContraturno: contraturnoDiscountVal,
+      tipoDescontoRegular: discountType,
+      valorDescontoRegularInput: discountInput,
+      tipoDescontoContraturno: contraturnoDiscountType,
+      valorDescontoContraturnoInput: contraturnoDiscountInput
     };
 
     const contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null = enableContraturno && weeklyFrequency > 0 ? {
@@ -205,19 +237,54 @@ export default function NegotiationCalc({
                 {/* Discount and negotiation settings */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-600 block">Conceder Desconto Mensal (R$)</label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-slate-600">Desconto Regular</label>
+                      <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDiscountType('reais');
+                            setDiscountInput(0);
+                          }}
+                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                            discountType === 'reais' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'
+                          }`}
+                        >
+                          R$
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDiscountType('porcentagem');
+                            setDiscountInput(0);
+                          }}
+                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                            discountType === 'porcentagem' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'
+                          }`}
+                        >
+                          %
+                        </button>
+                      </div>
+                    </div>
                     <div className="relative">
-                      <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-mono">R$</span>
+                      <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-mono">
+                        {discountType === 'reais' ? 'R$' : '%'}
+                      </span>
                       <input
                         type="number"
                         min="0"
-                        max={regularBasePrice}
-                        value={discountVal || ''}
-                        onChange={(e) => setDiscountVal(Number(e.target.value))}
+                        max={discountType === 'reais' ? regularBasePrice : 100}
+                        value={discountInput || ''}
+                        onChange={(e) => setDiscountInput(Number(e.target.value))}
                         className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none"
                         placeholder="0"
                       />
                     </div>
+                    {discountType === 'porcentagem' && discountInput > 0 && (
+                      <span className="text-[10px] text-slate-500 font-medium block">
+                        Equivale a R$ {discountVal} de desconto.
+                      </span>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -318,19 +385,54 @@ export default function NegotiationCalc({
 
                       {/* Contraturno discount field */}
                       <div className="space-y-1 pt-2 border-t border-slate-200">
-                        <label className="text-xs font-bold text-slate-600 block">Conceder Desconto Contraturno (R$)</label>
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-slate-600">Desconto Contraturno</label>
+                          <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContraturnoDiscountType('reais');
+                                setContraturnoDiscountInput(0);
+                              }}
+                              className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                                contraturnoDiscountType === 'reais' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'
+                              }`}
+                            >
+                              R$
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContraturnoDiscountType('porcentagem');
+                                setContraturnoDiscountInput(0);
+                              }}
+                              className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                                contraturnoDiscountType === 'porcentagem' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'
+                              }`}
+                            >
+                              %
+                            </button>
+                          </div>
+                        </div>
                         <div className="relative">
-                          <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-mono">R$</span>
+                          <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-mono">
+                            {contraturnoDiscountType === 'reais' ? 'R$' : '%'}
+                          </span>
                           <input
                             type="number"
                             min="0"
-                            max={contraturnoPrice}
-                            value={contraturnoDiscountVal || ''}
-                            onChange={(e) => setContraturnoDiscountVal(Number(e.target.value))}
+                            max={contraturnoDiscountType === 'reais' ? contraturnoPrice : 100}
+                            value={contraturnoDiscountInput || ''}
+                            onChange={(e) => setContraturnoDiscountInput(Number(e.target.value))}
                             className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white"
                             placeholder="0"
                           />
                         </div>
+                        {contraturnoDiscountType === 'porcentagem' && contraturnoDiscountInput > 0 && (
+                          <span className="text-[10px] text-slate-500 font-medium block">
+                            Equivale a R$ {contraturnoDiscountVal} de desconto.
+                          </span>
+                        )}
                         <p className="text-[9px] text-slate-400">Desconto mensal aplicado exclusivamente à mensalidade do Contraturno.</p>
                       </div>
                     </motion.div>

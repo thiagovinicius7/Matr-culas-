@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement } from '../types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -11,6 +11,7 @@ interface StudentProfileProps {
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
   movements: FinancialMovement[];
+  classPrices: RegularClass[];
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
@@ -19,6 +20,8 @@ interface StudentProfileProps {
   onDeleteStudent: (id: string) => void;
   onAddGuardian: (guardian: Omit<Guardian, 'id'>) => void;
   onDeleteGuardian: (id: string) => void;
+  onUpdateGuardian: (guardian: Guardian) => void;
+  onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
 }
 
 export default function StudentProfile({
@@ -27,6 +30,7 @@ export default function StudentProfile({
   enrollments,
   contraturnos,
   movements,
+  classPrices,
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
   onNavigateWithStudent,
@@ -34,7 +38,9 @@ export default function StudentProfile({
   onUpdateStudent,
   onDeleteStudent,
   onAddGuardian,
-  onDeleteGuardian
+  onDeleteGuardian,
+  onUpdateGuardian,
+  onUpdateEnrollmentClass
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +73,46 @@ export default function StudentProfile({
   const [newGuardianContato, setNewGuardianContato] = useState('');
   const [newGuardianFinanceiro, setNewGuardianFinanceiro] = useState(false);
   const [isAddingSingleGuardian, setIsAddingSingleGuardian] = useState(false);
+
+  // Guardian editing states
+  const [editingGuardianId, setEditingGuardianId] = useState<string | null>(null);
+  const [editGuardianNome, setEditGuardianNome] = useState('');
+  const [editGuardianParentesco, setEditGuardianParentesco] = useState('Mãe');
+  const [editGuardianContato, setEditGuardianContato] = useState('');
+  const [editGuardianFinanceiro, setEditGuardianFinanceiro] = useState(false);
+
+  // Class override states
+  const [isOverridingClass, setIsOverridingClass] = useState(false);
+  const [overrideClassId, setOverrideClassId] = useState('');
+
+  const startEditGuardian = (g: Guardian) => {
+    setEditingGuardianId(g.id);
+    setEditGuardianNome(g.nome);
+    setEditGuardianParentesco(g.parentesco);
+    setEditGuardianContato(g.contato);
+    setEditGuardianFinanceiro(g.financeiro);
+  };
+
+  const cancelEditGuardian = () => {
+    setEditingGuardianId(null);
+  };
+
+  const handleSaveGuardianEdit = (e: React.FormEvent, guardianId: string) => {
+    e.preventDefault();
+    if (!editGuardianNome.trim() || !editGuardianContato.trim()) {
+      alert('Preencha o nome e o contato do responsável.');
+      return;
+    }
+    onUpdateGuardian({
+      id: guardianId,
+      alunoId: selectedStudentId,
+      nome: editGuardianNome,
+      parentesco: editGuardianParentesco,
+      contato: editGuardianContato,
+      financeiro: editGuardianFinanceiro
+    });
+    setEditingGuardianId(null);
+  };
 
   // Selected student computation
   const activeStudent = students.find(s => s.id === selectedStudentId);
@@ -719,46 +765,131 @@ export default function StudentProfile({
                   )}
 
                   <div className="space-y-3">
-                    {activeGuardians.map((g) => (
-                      <div key={g.id} className="p-3 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-between bg-slate-50">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs text-slate-800">{g.nome}</span>
-                            <span className="text-[10px] text-slate-500 font-semibold">({g.parentesco})</span>
-                          </div>
-                          <p className="text-xs text-slate-500 flex items-center gap-1">
-                            <Phone size={12} className="text-slate-400" />
-                            {g.contato}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {g.financeiro && (
-                            <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
-                              <Shield size={10} /> Fin
-                            </span>
-                          )}
-                          <button
-                            onClick={() => {
-                              if (activeGuardians.length === 1) {
-                                alert('O aluno precisa ter pelo menos 1 responsável cadastrado.');
-                                return;
-                              }
-                              if (g.financeiro) {
-                                alert('Escolha outro responsável financeiro antes de remover este.');
-                                return;
-                              }
-                              if (confirm(`Remover responsável ${g.nome}?`)) {
-                                onDeleteGuardian(g.id);
-                              }
-                            }}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer"
+                    {activeGuardians.map((g) => {
+                      if (editingGuardianId === g.id) {
+                        return (
+                          <form 
+                            key={g.id} 
+                            onSubmit={(e) => handleSaveGuardianEdit(e, g.id)}
+                            className="p-3 bg-slate-100 rounded-lg border border-orange-200 space-y-2 text-left"
                           >
-                            <Trash2 size={13} />
-                          </button>
+                            <div className="text-[10px] font-bold text-orange-800 uppercase tracking-wider mb-1">Editar Responsável</div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500">Nome</label>
+                              <input
+                                type="text"
+                                required
+                                value={editGuardianNome}
+                                onChange={(e) => setEditGuardianNome(e.target.value)}
+                                className="w-full text-xs px-2 py-1 rounded-md border border-slate-300 bg-white"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-500">Parentesco</label>
+                                <select
+                                  value={editGuardianParentesco}
+                                  onChange={(e) => setEditGuardianParentesco(e.target.value)}
+                                  className="w-full text-xs px-1.5 py-1 rounded-md border border-slate-300 bg-white"
+                                >
+                                  <option value="Mãe">Mãe</option>
+                                  <option value="Pai">Pai</option>
+                                  <option value="Avó">Avó/Avô</option>
+                                  <option value="Tio">Tio/Tia</option>
+                                  <option value="Outro">Outro</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-slate-500">Contato</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={editGuardianContato}
+                                  onChange={(e) => setEditGuardianContato(e.target.value)}
+                                  className="w-full text-xs px-2 py-1 rounded-md border border-slate-300 bg-white"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-1">
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  id={`edit-fin-${g.id}`}
+                                  checked={editGuardianFinanceiro}
+                                  onChange={(e) => setEditGuardianFinanceiro(e.target.checked)}
+                                  className="w-3.5 h-3.5 text-emerald-600 rounded"
+                                />
+                                <label htmlFor={`edit-fin-${g.id}`} className="text-[11px] text-slate-700 font-bold cursor-pointer">Financeiro</label>
+                              </div>
+                              <div className="flex gap-1">
+                                <button
+                                  type="button"
+                                  onClick={cancelEditGuardian}
+                                  className="px-2 py-1 border border-slate-300 text-[10px] font-bold text-slate-600 bg-white rounded-md hover:bg-slate-50"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold rounded-md"
+                                >
+                                  Salvar
+                                </button>
+                              </div>
+                            </div>
+                          </form>
+                        );
+                      }
+
+                      return (
+                        <div key={g.id} className="p-3 rounded-lg border border-slate-100 hover:bg-slate-50 flex items-center justify-between bg-slate-50">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-xs text-slate-800">{g.nome}</span>
+                              <span className="text-[10px] text-slate-500 font-semibold">({g.parentesco})</span>
+                            </div>
+                            <p className="text-xs text-slate-500 flex items-center gap-1">
+                              <Phone size={12} className="text-slate-400" />
+                              {g.contato}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {g.financeiro && (
+                              <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase flex items-center gap-1 mr-1">
+                                <Shield size={10} /> Fin
+                              </span>
+                            )}
+                            <button
+                              onClick={() => startEditGuardian(g)}
+                              className="p-1 text-slate-400 hover:text-slate-600 rounded-md cursor-pointer animate-none"
+                              title="Editar responsável"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (activeGuardians.length === 1) {
+                                  alert('O aluno precisa ter pelo menos 1 responsável cadastrado.');
+                                  return;
+                                }
+                                if (g.financeiro) {
+                                  alert('Escolha outro responsável financeiro antes de remover este.');
+                                  return;
+                                }
+                                if (confirm(`Remover responsável ${g.nome}?`)) {
+                                  onDeleteGuardian(g.id);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer animate-none"
+                              title="Remover responsável"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -768,17 +899,68 @@ export default function StudentProfile({
 
                   {activeEnrollments.length > 0 ? (
                     activeEnrollments.map((e) => {
-                      const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId) || suggestedClass;
+                      const regularClass = classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId) || suggestedClass;
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
-                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-slate-700">Turma Determinada (31/03)</span>
-                              <span className="text-xs font-mono font-bold bg-white text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                                {regularClass?.nome || 'Nenhuma'}
-                              </span>
+                              <span className="text-xs font-bold text-slate-700">Turma de Matrícula</span>
+                              {!isOverridingClass ? (
+                                <span className="text-xs font-mono font-bold bg-white text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+                                  {regularClass?.nome || 'Nenhuma'}
+                                </span>
+                              ) : (
+                                <select
+                                  value={overrideClassId || e.turmaRegularId}
+                                  onChange={(evt) => setOverrideClassId(evt.target.value)}
+                                  className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md focus:outline-none"
+                                >
+                                  {(classPrices.length > 0 ? classPrices : REGULAR_CLASSES).map((cls) => (
+                                    <option key={cls.id} value={cls.id}>
+                                      {cls.nome} (R$ {cls.valorMensal})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1">Determinada automaticamente e travada conforme idade.</p>
+                            
+                            <div className="flex justify-between items-center pt-1 border-t border-slate-100/60 mt-1">
+                              <p className="text-[10px] text-slate-500">
+                                {isOverridingClass ? 'Selecione a nova turma desejada para o aluno.' : 'Determinada automaticamente por idade (ou alterada manualmente).'}
+                              </p>
+                              {!isOverridingClass ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOverrideClassId(e.turmaRegularId);
+                                    setIsOverridingClass(true);
+                                  }}
+                                  className="text-[10px] font-bold text-orange-600 hover:underline flex items-center gap-0.5 bg-transparent border-0 cursor-pointer"
+                                >
+                                  Mudar Turma (Excepcional)
+                                </button>
+                              ) : (
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsOverridingClass(false)}
+                                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onUpdateEnrollmentClass(activeStudent.id, overrideClassId);
+                                      setIsOverridingClass(false);
+                                    }}
+                                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-md"
+                                  >
+                                    Confirmar
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="space-y-1">

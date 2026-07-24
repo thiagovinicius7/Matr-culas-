@@ -490,7 +490,15 @@ export default function App() {
   };
 
   // Handler: Update Discounts from Worklist directly
-  const handleUpdateEnrollmentDiscounts = (alunoId: string, discountRegular: number, discountContraturno: number) => {
+  const handleUpdateEnrollmentDiscounts = (
+    alunoId: string, 
+    discountRegular: number, 
+    discountContraturno: number,
+    tipoDescontoRegular?: 'reais' | 'porcentagem',
+    valorDescontoRegularInput?: number,
+    tipoDescontoContraturno?: 'reais' | 'porcentagem',
+    valorDescontoContraturnoInput?: number
+  ) => {
     setEnrollments(prev => prev.map(e => {
       if (e.alunoId === alunoId && e.ano === 2026) {
         const finalRegular = Math.max(0, e.valorRegularOriginal - discountRegular);
@@ -498,7 +506,11 @@ export default function App() {
           ...e, 
           descontoMensal: discountRegular, 
           valorFinalRegular: finalRegular,
-          descontoContraturno: discountContraturno
+          descontoContraturno: discountContraturno,
+          tipoDescontoRegular: tipoDescontoRegular || e.tipoDescontoRegular || 'reais',
+          valorDescontoRegularInput: valorDescontoRegularInput !== undefined ? valorDescontoRegularInput : e.valorDescontoRegularInput,
+          tipoDescontoContraturno: tipoDescontoContraturno || e.tipoDescontoContraturno || 'reais',
+          valorDescontoContraturnoInput: valorDescontoContraturnoInput !== undefined ? valorDescontoContraturnoInput : e.valorDescontoContraturnoInput
         };
         saveDocument('enrollments', updatedEnroll);
         return updatedEnroll;
@@ -523,17 +535,89 @@ export default function App() {
     // Log financial movement
     const student = students.find(s => s.id === alunoId);
     if (student) {
+      const descRegularStr = tipoDescontoRegular === 'porcentagem' ? `${valorDescontoRegularInput}%` : `R$ ${discountRegular}`;
+      const descContraStr = tipoDescontoContraturno === 'porcentagem' ? `${valorDescontoContraturnoInput}%` : `R$ ${discountContraturno}`;
       const movement: FinancialMovement = {
         id: `mov_disc_${Date.now()}`,
         alunoId: student.id,
         data: new Date().toISOString().split('T')[0],
         tipo: 'Desconto_Alterado',
-        descricao: `Descontos ajustados na lista de trabalho: Regular de R$ ${discountRegular}/mês e Contraturno de R$ ${discountContraturno}/mês.`,
+        descricao: `Descontos ajustados na lista de trabalho: Regular de ${descRegularStr}/mês e Contraturno de ${descContraStr}/mês.`,
         valorAnterior: 0,
         valorNovo: 0
       };
       setMovements(prev => [...prev, movement]);
       saveDocument('movements', movement);
+    }
+  };
+
+  // Handler: Change regular class manually (exceptional case)
+  const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
+    const match = classPrices.find(c => c.id === turmaRegularId) || REGULAR_CLASSES.find(c => c.id === turmaRegularId);
+    const basePrice = match ? match.valorMensal : 0;
+
+    setEnrollments(prev => prev.map(e => {
+      if (e.alunoId === alunoId && e.ano === 2026) {
+        // Re-calculate the discount in Reais if the type is percentage, otherwise it remains fixed in Reais
+        let finalDiscount = e.descontoMensal;
+        if (e.tipoDescontoRegular === 'porcentagem' && e.valorDescontoRegularInput !== undefined) {
+          finalDiscount = Math.round(basePrice * (e.valorDescontoRegularInput / 100));
+        } else {
+          // Cap fixed discount at the new base price
+          finalDiscount = Math.min(e.descontoMensal, basePrice);
+        }
+
+        const finalRegular = Math.max(0, basePrice - finalDiscount);
+        const updatedEnroll = { 
+          ...e, 
+          turmaRegularId,
+          valorRegularOriginal: basePrice,
+          descontoMensal: finalDiscount,
+          valorFinalRegular: finalRegular
+        };
+        saveDocument('enrollments', updatedEnroll);
+        return updatedEnroll;
+      }
+      return e;
+    }));
+
+    // Log financial movement
+    const student = students.find(s => s.id === alunoId);
+    if (student) {
+      const movement: FinancialMovement = {
+        id: `mov_class_${Date.now()}`,
+        alunoId: student.id,
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'Desconto_Alterado',
+        descricao: `Alteração excepcional de turma regular para: ${match?.nome || 'Desconhecida'} (Mensalidade base ajustada para R$ ${basePrice}).`,
+        valorAnterior: 0,
+        valorNovo: 0
+      };
+      setMovements(prev => [...prev, movement]);
+      saveDocument('movements', movement);
+    }
+  };
+
+  // Handler: Update an existing guardian in place
+  const handleUpdateGuardian = (updatedGuardian: Guardian) => {
+    setGuardians(prev => prev.map(g => {
+      if (g.id === updatedGuardian.id) {
+        saveDocument('guardians', updatedGuardian);
+        return updatedGuardian;
+      }
+      return g;
+    }));
+
+    // If set as financeiro, deactivate other guardians' financeiro status for the same student
+    if (updatedGuardian.financeiro) {
+      setGuardians(prev => prev.map(g => {
+        if (g.alunoId === updatedGuardian.alunoId && g.id !== updatedGuardian.id && g.financeiro) {
+          const disabledFin = { ...g, financeiro: false };
+          saveDocument('guardians', disabledFin);
+          return disabledFin;
+        }
+        return g;
+      }));
     }
   };
 
@@ -758,6 +842,7 @@ export default function App() {
                   enrollments={enrollments} 
                   contraturnos={contraturnos} 
                   movements={movements}
+                  classPrices={classPrices}
                   selectedStudentId={selectedStudentId}
                   onSelectStudent={setSelectedStudentId}
                   onAddStudent={handleAddStudent}
@@ -765,6 +850,8 @@ export default function App() {
                   onDeleteStudent={handleDeleteStudent}
                   onAddGuardian={handleAddGuardian}
                   onDeleteGuardian={handleDeleteGuardian}
+                  onUpdateGuardian={handleUpdateGuardian}
+                  onUpdateEnrollmentClass={handleUpdateEnrollmentClass}
                 />
               )}
               {activeTab === 'negotiation' && (

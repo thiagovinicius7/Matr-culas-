@@ -49,6 +49,10 @@ export interface Enrollment {
   statusNegociacao: 'Pendente' | 'Em Negociação' | 'Confirmada' | 'Cancelada';
   anotacoes: string;
   descontoContraturno?: number;
+  tipoDescontoRegular?: 'reais' | 'porcentagem';
+  valorDescontoRegularInput?: number;
+  tipoDescontoContraturno?: 'reais' | 'porcentagem';
+  valorDescontoContraturnoInput?: number;
 }
 
 export interface FinancialMovement {
