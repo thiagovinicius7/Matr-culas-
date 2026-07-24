@@ -93,6 +93,13 @@ export default function App() {
 
   // Handler: Import full Sítio-Escola Geranium Student Report Data
   const handleImportGeraniumData = async () => {
+    const confirmado = window.confirm(
+      'Importar o Relatório de Turmas vai APAGAR todos os alunos, responsáveis, matrículas e ' +
+      'contraturnos cadastrados atualmente e substituir pelos dados do relatório. Essa ação não ' +
+      'pode ser desfeita. Deseja continuar?'
+    );
+    if (!confirmado) return;
+
     try {
       setLoading(true);
       
@@ -111,6 +118,12 @@ export default function App() {
         ...contraturnosList.map(c => saveDocument('contraturnos', c))
       ]);
 
+      window.alert(
+        'Importação concluída: ' + IMPORTED_STUDENTS.length + ' alunos, ' +
+        guardiansList.length + ' responsáveis, ' + enrollmentsList.length + ' matrículas e ' +
+        contraturnosList.length + ' contraturnos carregados.'
+      );
+
       // Set local state to the clean imported dataset only
       setStudents(IMPORTED_STUDENTS);
       setGuardians(guardiansList);
@@ -120,6 +133,7 @@ export default function App() {
 
     } catch (error) {
       console.error('Error importing Geranium data:', error);
+      window.alert('A importação falhou. Nada foi apagado. Detalhe do erro no console (F12).');
     } finally {
       setLoading(false);
     }
