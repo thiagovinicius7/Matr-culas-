@@ -31,6 +31,7 @@ export default function RematriculaList({
 }: RematriculaListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
 
   const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
   const [tempDiscountRegular, setTempDiscountRegular] = useState<number>(0);
@@ -47,14 +48,20 @@ export default function RematriculaList({
   const [editingNotesStudentId, setEditingNotesStudentId] = useState<string | null>(null);
   const [tempNotesValue, setTempNotesValue] = useState('');
 
+  // Available enrollment years
+  const availableYears = Array.from(new Set([2026, ...enrollments.map(e => e.ano)])).sort((a, b) => a - b);
+
+  // Filter enrollments by selected year
+  const yearEnrollments = enrollments.filter(e => e.ano === selectedYear);
+
   // Counter summary
-  const total = enrollments.length;
-  const confirmed = enrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
-  const negotiating = enrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
-  const pending = enrollments.filter(e => e.statusNegociacao === 'Pendente').length;
+  const total = yearEnrollments.length;
+  const confirmed = yearEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
+  const negotiating = yearEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
+  const pending = yearEnrollments.filter(e => e.statusNegociacao === 'Pendente').length;
 
   // Process list with student and guardian joins
-  const rematriculaData = enrollments.map(e => {
+  const rematriculaData = yearEnrollments.map(e => {
     const student = students.find(s => s.id === e.alunoId);
     const financialGuardian = guardians.find(g => g.alunoId === e.alunoId && g.financeiro);
     const regularClass = classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
@@ -154,16 +161,31 @@ export default function RematriculaList({
           ))}
         </div>
 
-        {/* Search Input */}
-        <div className="relative min-w-[240px]">
-          <Search size={13} className="absolute left-3 top-2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar por aluno ou pai/mãe..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-slate-50"
-          />
+        {/* Right tools: Year Selector & Search */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-slate-500 uppercase">Ano:</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="text-xs px-2.5 py-1 rounded-md border border-slate-200 bg-slate-50 font-bold focus:outline-none cursor-pointer"
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative min-w-[240px]">
+            <Search size={13} className="absolute left-3 top-2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar por aluno ou pai/mãe..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-slate-50"
+            />
+          </div>
         </div>
       </div>
 

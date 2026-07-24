@@ -22,6 +22,7 @@ export interface RegularClass {
   natureza: 'Infantil' | 'Fundamental';
   idadeRef: number;
   valorMensal: number;
+  ano?: number;
 }
 
 export type ContraturnoNature = 'Melaço' | 'Marmelada';
@@ -70,4 +71,5 @@ export interface ContraturnoPrice {
   frequencia: number; // 0 is avulso, 1-5 is weekly frequency
   valorParcial: number;
   valorCompleto: number;
+  ano?: number;
 }

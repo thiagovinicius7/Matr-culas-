@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 interface PricingSettingsProps {
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
-  onSavePrices: (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[]) => void;
+  onSavePrices: (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => void;
 }
 
 export default function PricingSettings({
@@ -15,22 +15,81 @@ export default function PricingSettings({
   contraturnoPrices,
   onSavePrices
 }: PricingSettingsProps) {
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [customYears, setCustomYears] = useState<number[]>([]);
+  const [showAddYear, setShowAddYear] = useState(false);
+  const [newYearInput, setNewYearInput] = useState('');
+  const [yearError, setYearError] = useState('');
+
   const [localClasses, setLocalClasses] = useState<RegularClass[]>([]);
   const [localContraturno, setLocalContraturno] = useState<ContraturnoPrice[]>([]);
   const [isSaved, setIsSaved] = useState(false);
 
-  // Sync local states when props load or change
+  // Derive available years
+  const availableYears = Array.from(
+    new Set([
+      2026,
+      ...classPrices.map(c => c.ano || 2026),
+      ...contraturnoPrices.map(cp => cp.ano || 2026),
+      ...customYears
+    ])
+  ).sort((a, b) => a - b);
+
+  // Sync local states when selectedYear or classPrices change
   useEffect(() => {
-    if (classPrices && classPrices.length > 0) {
-      setLocalClasses([...classPrices]);
+    const classesForYear = classPrices.filter(c => (c.ano || 2026) === selectedYear);
+    if (classesForYear.length > 0) {
+      setLocalClasses(classesForYear.map(c => ({ ...c, ano: selectedYear })));
+    } else {
+      // Find base classes to copy (prefer 2026, or whatever is available)
+      const baseYear = classPrices.some(c => (c.ano || 2026) === 2026) ? 2026 : (classPrices[0]?.ano || 2026);
+      const baseClasses = classPrices.filter(c => (c.ano || 2026) === baseYear);
+      if (baseClasses.length > 0) {
+        const copied = baseClasses.map(c => ({
+          ...c,
+          id: `class_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          ano: selectedYear
+        }));
+        setLocalClasses(copied);
+      } else {
+        // Fallback to static defaults
+        const copied = REGULAR_CLASSES.map(c => ({
+          ...c,
+          id: `class_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          ano: selectedYear
+        }));
+        setLocalClasses(copied);
+      }
     }
-  }, [classPrices]);
+  }, [classPrices, selectedYear]);
 
   useEffect(() => {
-    if (contraturnoPrices && contraturnoPrices.length > 0) {
-      setLocalContraturno([...contraturnoPrices]);
+    const contraturnoForYear = contraturnoPrices.filter(cp => (cp.ano || 2026) === selectedYear);
+    if (contraturnoForYear.length > 0) {
+      setLocalContraturno(contraturnoForYear.map(cp => ({ ...cp, ano: selectedYear })));
+    } else {
+      const baseYear = contraturnoPrices.some(cp => (cp.ano || 2026) === 2026) ? 2026 : (contraturnoPrices[0]?.ano || 2026);
+      const baseContraturno = contraturnoPrices.filter(cp => (cp.ano || 2026) === baseYear);
+      if (baseContraturno.length > 0) {
+        const copied = baseContraturno.map(cp => ({
+          ...cp,
+          id: `freq_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          ano: selectedYear
+        }));
+        setLocalContraturno(copied);
+      } else {
+        const defaultContraturno: ContraturnoPrice[] = [
+          { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, ano: selectedYear },
+          { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, ano: selectedYear },
+          { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, ano: selectedYear },
+          { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, ano: selectedYear },
+          { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, ano: selectedYear },
+          { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, ano: selectedYear }
+        ];
+        setLocalContraturno(defaultContraturno);
+      }
     }
-  }, [contraturnoPrices]);
+  }, [contraturnoPrices, selectedYear]);
 
   const handleClassFieldChange = (id: string, field: keyof RegularClass, value: any) => {
     setLocalClasses(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
@@ -49,7 +108,8 @@ export default function PricingSettings({
       nome: 'Nova Turma',
       natureza: 'Infantil',
       idadeRef: 4,
-      valorMensal: 1000
+      valorMensal: 1000,
+      ano: selectedYear
     };
     setLocalClasses(prev => [...prev, newCls]);
     setIsSaved(false);
@@ -69,7 +129,8 @@ export default function PricingSettings({
       id: newId,
       frequencia: maxFreq >= 5 ? maxFreq + 1 : maxFreq + 1,
       valorParcial: 300,
-      valorCompleto: 500
+      valorCompleto: 500,
+      ano: selectedYear
     };
     setLocalContraturno(prev => [...prev, newCt].sort((a, b) => a.frequencia - b.frequencia));
     setIsSaved(false);
@@ -83,24 +144,25 @@ export default function PricingSettings({
   };
 
   const handleSave = () => {
-    onSavePrices(localClasses, localContraturno);
+    onSavePrices(localClasses, localContraturno, selectedYear);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 4000);
   };
 
   const handleRestoreDefaults = () => {
-    if (confirm('Deseja restaurar todos os valores para os padrões originais do Sítio Geranium? Isso substituirá as edições atuais.')) {
+    if (confirm(`Deseja restaurar todos os valores para os padrões originais do Sítio Geranium para o ano ${selectedYear}? Isso substituirá as edições atuais deste ano.`)) {
       const defaultContraturno: ContraturnoPrice[] = [
-        { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120 },
-        { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260 },
-        { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520 },
-        { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690 },
-        { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5 },
-        { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035 }
+        { id: `avulso`, frequencia: 0, valorParcial: 100, valorCompleto: 120, ano: selectedYear },
+        { id: `freq_1`, frequencia: 1, valorParcial: 220, valorCompleto: 260, ano: selectedYear },
+        { id: `freq_2`, frequencia: 2, valorParcial: 460, valorCompleto: 520, ano: selectedYear },
+        { id: `freq_3`, frequencia: 3, valorParcial: 630, valorCompleto: 690, ano: selectedYear },
+        { id: `freq_4`, frequencia: 4, valorParcial: 775, valorCompleto: 862.5, ano: selectedYear },
+        { id: `freq_5`, frequencia: 5, valorParcial: 920, valorCompleto: 1035, ano: selectedYear }
       ];
-      setLocalClasses([...REGULAR_CLASSES]);
+      const defaultClasses = REGULAR_CLASSES.map(rc => ({ ...rc, id: `${selectedYear}_${rc.id}`, ano: selectedYear }));
+      setLocalClasses(defaultClasses);
       setLocalContraturno(defaultContraturno);
-      onSavePrices([...REGULAR_CLASSES], defaultContraturno);
+      onSavePrices(defaultClasses, defaultContraturno, selectedYear);
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 4000);
     }
@@ -144,6 +206,82 @@ export default function PricingSettings({
           Os valores de mensalidade foram gravados na nuvem e atualizados com sucesso em todo o sistema.
         </div>
       )}
+
+      {/* Year Selector Widget */}
+      <div className="bg-orange-50/60 p-3 rounded-lg border border-orange-100 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-orange-800 uppercase tracking-wider">Ano de Vigência das Mensalidades:</span>
+          <select
+            value={selectedYear}
+            onChange={(e) => {
+              setSelectedYear(Number(e.target.value));
+              setIsSaved(false);
+            }}
+            className="text-xs font-bold px-3 py-1.5 rounded-md border border-slate-200 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-400"
+          >
+            {availableYears.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
+
+        {showAddYear ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              pattern="\d*"
+              maxLength={4}
+              placeholder="Ex: 2027"
+              value={newYearInput}
+              onChange={(e) => {
+                setNewYearInput(e.target.value.replace(/\D/g, ''));
+                setYearError('');
+              }}
+              className="text-xs px-2.5 py-1.5 border border-slate-200 rounded-md focus:border-orange-500 focus:outline-none w-24 bg-white font-bold"
+            />
+            <button
+              onClick={() => {
+                const parsed = parseInt(newYearInput, 10);
+                if (isNaN(parsed) || parsed < 2000 || parsed > 2100) {
+                  setYearError('Ano inválido.');
+                  return;
+                }
+                if (availableYears.includes(parsed)) {
+                  setYearError('Ano já cadastrado.');
+                  return;
+                }
+                setCustomYears(prev => [...prev, parsed]);
+                setSelectedYear(parsed);
+                setShowAddYear(false);
+                setNewYearInput('');
+                setYearError('');
+              }}
+              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold rounded-md cursor-pointer transition-colors"
+            >
+              Confirmar
+            </button>
+            <button
+              onClick={() => {
+                setShowAddYear(false);
+                setNewYearInput('');
+                setYearError('');
+              }}
+              className="px-2 py-1.5 text-slate-500 hover:text-slate-800 text-[10px] font-bold"
+            >
+              Cancelar
+            </button>
+            {yearError && <span className="text-[10px] font-semibold text-rose-600">{yearError}</span>}
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddYear(true)}
+            className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+          >
+            <Plus size={11} />
+            Adicionar Novo Ano
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Regular Classes Column */}

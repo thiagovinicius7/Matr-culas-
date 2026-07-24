@@ -32,6 +32,7 @@ export default function NegotiationCalc({
   onConfirmNegotiation
 }: NegotiationCalcProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || '');
+  const [selectedYear, setSelectedYear] = useState<number>(2026);
 
   useEffect(() => {
     if (propSelectedStudentId) {
@@ -57,19 +58,28 @@ export default function NegotiationCalc({
   // Result success state
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Derive available years
+  const availableYears = Array.from(
+    new Set([
+      2026,
+      ...classPrices.map(c => c.ano || 2026),
+      ...contraturnoPrices.map(cp => cp.ano || 2026)
+    ])
+  ).sort((a, b) => a - b);
+
   // Derive student properties
   const selectedStudent = students.find(s => s.id === selectedStudentId);
   const financialGuardian = guardians.find(g => g.alunoId === selectedStudentId && g.financeiro);
 
-  const studentAge = selectedStudent ? calculateAgeAtCutoff(selectedStudent.nascimento, 2026) : 0;
+  const studentAge = selectedStudent ? calculateAgeAtCutoff(selectedStudent.nascimento, selectedYear) : 0;
   
   // Try to find the enrollment's existing class override first, otherwise fall back to age cut-off suggestion
-  const existingEnrollment = selectedStudent ? enrollments.find(e => e.alunoId === selectedStudent.id && e.ano === 2026) : null;
+  const existingEnrollment = selectedStudent ? enrollments.find(e => e.alunoId === selectedStudent.id && e.ano === selectedYear) : null;
   const currentTurmaRegularId = existingEnrollment ? existingEnrollment.turmaRegularId : null;
   const regularClass = selectedStudent 
     ? (currentTurmaRegularId 
-        ? (classPrices.find(c => c.id === currentTurmaRegularId) || getRegularClassForAgeDynamic(studentAge, classPrices)) 
-        : getRegularClassForAgeDynamic(studentAge, classPrices)) 
+        ? (classPrices.find(c => c.id === currentTurmaRegularId) || getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
+        : getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
     : null;
 
   // Derive contraturno nature based on student age
@@ -87,7 +97,7 @@ export default function NegotiationCalc({
   const regularWithDiscount = Math.max(0, regularBasePrice - discountVal);
 
   const weeklyFrequency = selectedDays.length;
-  const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices) : 0;
+  const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices, selectedYear) : 0;
 
   // Calculate contraturno discount value in Reais
   const contraturnoDiscountVal = contraturnoDiscountType === 'porcentagem'
@@ -98,10 +108,10 @@ export default function NegotiationCalc({
 
   const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted;
 
-  // Auto-fill existing negotiation if student changes
+  // Auto-fill existing negotiation if student changes or selected year changes
   useEffect(() => {
     if (selectedStudentId) {
-      const existing = enrollments.find(e => e.alunoId === selectedStudentId);
+      const existing = enrollments.find(e => e.alunoId === selectedStudentId && e.ano === selectedYear);
       if (existing) {
         setDiscountType(existing.tipoDescontoRegular || 'reais');
         setDiscountInput(existing.valorDescontoRegularInput !== undefined ? existing.valorDescontoRegularInput : existing.descontoMensal);
@@ -131,7 +141,7 @@ export default function NegotiationCalc({
       }
       setSuccessMsg(null);
     }
-  }, [selectedStudentId, enrollments, contraturnos]);
+  }, [selectedStudentId, selectedYear, enrollments, contraturnos]);
 
   const toggleDay = (day: 'Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex') => {
     if (selectedDays.includes(day)) {
@@ -148,7 +158,7 @@ export default function NegotiationCalc({
     }
 
     const enrollmentData: Omit<Enrollment, 'id' | 'alunoId'> = {
-      ano: 2026,
+      ano: selectedYear,
       turmaRegularId: regularClass!.id,
       valorRegularOriginal: regularBasePrice,
       descontoMensal: discountVal,
@@ -172,7 +182,7 @@ export default function NegotiationCalc({
     } : null;
 
     onConfirmNegotiation(selectedStudentId, enrollmentData, contraturnoData);
-    setSuccessMsg(`Negociação para ${selectedStudent?.nome} salva com sucesso! O contrato e o histórico financeiro foram atualizados.`);
+    setSuccessMsg(`Negociação para ${selectedStudent?.nome} salva com sucesso para o ano ${selectedYear}! O contrato e o histórico financeiro foram atualizados.`);
     setTimeout(() => setSuccessMsg(null), 5000);
   };
 
@@ -193,22 +203,38 @@ export default function NegotiationCalc({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left column: Inputs form */}
         <div className="lg:col-span-7 bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-4">
-          {/* Student selection */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-600 block">Selecione o Aluno</label>
-            <select
-              value={selectedStudentId}
-              onChange={(e) => {
-                setSelectedStudentId(e.target.value);
-                onSelectStudent?.(e.target.value);
-              }}
-              className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white cursor-pointer"
-            >
-              <option value="">-- Selecione um aluno cadastrado --</option>
-              {students.map(s => (
-                <option key={s.id} value={s.id}>{s.nome}</option>
-              ))}
-            </select>
+          {/* Student selection and Year selection */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs font-bold text-slate-600 block">Selecione o Aluno</label>
+              <select
+                value={selectedStudentId}
+                onChange={(e) => {
+                  setSelectedStudentId(e.target.value);
+                  onSelectStudent?.(e.target.value);
+                }}
+                className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white cursor-pointer"
+              >
+                <option value="">-- Selecione um aluno cadastrado --</option>
+                {students.map(s => (
+                  <option key={s.id} value={s.id}>{s.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-600 block">Ano de Acordo</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(Number(e.target.value));
+                }}
+                className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white cursor-pointer"
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <AnimatePresence mode="wait">

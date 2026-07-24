@@ -85,26 +85,59 @@ export default function App() {
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
 
+        // Sanitize loaded Class Prices to ensure all have an 'ano' field
+        const sanitizedClassPrices = (loadedClassPrices || []).map(cp => {
+          if (!cp.ano) {
+            const match = cp.id.match(/^(\d{4})_(.+)$/);
+            return {
+              ...cp,
+              ano: match ? parseInt(match[1]) : 2026,
+              id: cp.id
+            };
+          }
+          return cp;
+        });
+
         // Process and seed custom Class Prices
-        let finalClassPrices = loadedClassPrices;
-        const needsClassPricingSeed = !finalClassPrices || finalClassPrices.length === 0 || finalClassPrices.some(cp => cp.id === 'mirim_1' && cp.valorMensal === 1600);
+        let finalClassPrices = sanitizedClassPrices;
+        const needsClassPricingSeed = finalClassPrices.length === 0 || finalClassPrices.some(cp => cp.id === 'mirim_1' && cp.valorMensal === 1600) || !finalClassPrices.some(cp => cp.ano === 2026);
         if (needsClassPricingSeed) {
-          finalClassPrices = [...REGULAR_CLASSES];
+          // If we had old unprefixed entries, let's remove them to avoid duplication
+          const oldUnprefixed = finalClassPrices.filter(cp => !cp.id.startsWith('2026_'));
+          await Promise.all(oldUnprefixed.map(cp => deleteDocument('classPrices', cp.id)));
+
+          finalClassPrices = [...REGULAR_CLASSES].map(c => ({ ...c, id: `2026_${c.id}`, ano: 2026 }));
           await Promise.all(finalClassPrices.map(cp => saveDocument('classPrices', cp)));
         }
         setClassPrices(finalClassPrices);
 
+        // Sanitize loaded Contraturno Prices
+        const sanitizedContraturnoPrices = (loadedContraturnoPrices || []).map(ctp => {
+          if (!ctp.ano) {
+            const match = ctp.id.match(/^(\d{4})_(.+)$/);
+            return {
+              ...ctp,
+              ano: match ? parseInt(match[1]) : 2026,
+              id: ctp.id
+            };
+          }
+          return ctp;
+        });
+
         // Process and seed custom Contraturno Prices
-        let finalContraturnoPrices = loadedContraturnoPrices;
-        const needsContraturnoPricingSeed = !finalContraturnoPrices || finalContraturnoPrices.length === 0 || finalContraturnoPrices.some(ctp => ctp.id === 'freq_1' && ctp.valorCompleto === 500);
+        let finalContraturnoPrices = sanitizedContraturnoPrices;
+        const needsContraturnoPricingSeed = finalContraturnoPrices.length === 0 || finalContraturnoPrices.some(ctp => ctp.id === 'freq_1' && ctp.valorCompleto === 500) || !finalContraturnoPrices.some(ctp => ctp.ano === 2026);
         if (needsContraturnoPricingSeed) {
+          const oldUnprefixed = finalContraturnoPrices.filter(ctp => !ctp.id.startsWith('2026_'));
+          await Promise.all(oldUnprefixed.map(ctp => deleteDocument('contraturnoPrices', ctp.id)));
+
           finalContraturnoPrices = [
-            { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120 },
-            { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260 },
-            { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520 },
-            { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690 },
-            { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5 },
-            { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035 }
+            { id: '2026_avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, ano: 2026 },
+            { id: '2026_freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, ano: 2026 },
+            { id: '2026_freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, ano: 2026 },
+            { id: '2026_freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, ano: 2026 },
+            { id: '2026_freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, ano: 2026 },
+            { id: '2026_freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, ano: 2026 }
           ];
           await Promise.all(finalContraturnoPrices.map(ctp => saveDocument('contraturnoPrices', ctp)));
         }
@@ -753,23 +786,43 @@ export default function App() {
   };
 
   // Handler: Save global pricing configurations
-  const handleSavePrices = async (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[]) => {
-    // Detect deleted classes
-    const currentClassIds = classPrices.map(c => c.id);
-    const updatedClassIds = updatedClasses.map(c => c.id);
-    const deletedClassIds = currentClassIds.filter(id => !updatedClassIds.includes(id));
+  const handleSavePrices = async (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => {
+    // 1. Filter out existing items for this year from our state
+    const otherYearsClasses = classPrices.filter(c => (c.ano || 2026) !== year);
+    const otherYearsContraturno = contraturnoPrices.filter(cp => (cp.ano || 2026) !== year);
 
-    // Detect deleted contraturno frequencies
-    const currentContraturnoIds = contraturnoPrices.map(cp => cp.id);
-    const updatedContraturnoIds = updatedContraturno.map(cp => cp.id);
-    const deletedContraturnoIds = currentContraturnoIds.filter(id => !updatedContraturnoIds.includes(id));
+    // Ensure all new/updated items have the correct year and prefixed id
+    const processedClasses = updatedClasses.map(c => {
+      const prefix = `${year}_`;
+      const finalId = c.id.startsWith(prefix) ? c.id : `${prefix}${c.id}`;
+      return { ...c, id: finalId, ano: year };
+    });
 
-    setClassPrices(updatedClasses);
-    setContraturnoPrices(updatedContraturno);
+    const processedContraturno = updatedContraturno.map(cp => {
+      const prefix = `${year}_`;
+      const finalId = cp.id.startsWith(prefix) ? cp.id : `${prefix}${cp.id}`;
+      return { ...cp, id: finalId, ano: year };
+    });
+
+    // Detect deleted classes for this specific year
+    const existingIdsForYear = classPrices.filter(c => (c.ano || 2026) === year).map(c => c.id);
+    const updatedIdsForYear = processedClasses.map(c => c.id);
+    const deletedClassIds = existingIdsForYear.filter(id => !updatedIdsForYear.includes(id));
+
+    // Detect deleted contraturno frequencies for this specific year
+    const existingContraturnoIdsForYear = contraturnoPrices.filter(cp => (cp.ano || 2026) === year).map(cp => cp.id);
+    const updatedContraturnoIdsForYear = processedContraturno.map(cp => cp.id);
+    const deletedContraturnoIds = existingContraturnoIdsForYear.filter(id => !updatedContraturnoIdsForYear.includes(id));
+
+    const newClassPrices = [...otherYearsClasses, ...processedClasses];
+    const newContraturnoPrices = [...otherYearsContraturno, ...processedContraturno];
+
+    setClassPrices(newClassPrices);
+    setContraturnoPrices(newContraturnoPrices);
 
     await Promise.all([
-      ...updatedClasses.map(c => saveDocument('classPrices', c)),
-      ...updatedContraturno.map(cp => saveDocument('contraturnoPrices', cp)),
+      ...processedClasses.map(c => saveDocument('classPrices', c)),
+      ...processedContraturno.map(cp => saveDocument('contraturnoPrices', cp)),
       ...deletedClassIds.map(id => deleteDocument('classPrices', id)),
       ...deletedContraturnoIds.map(id => deleteDocument('contraturnoPrices', id))
     ]);
@@ -780,7 +833,7 @@ export default function App() {
       alunoId: 'system',
       data: new Date().toISOString().split('T')[0],
       tipo: 'Reajuste_Geral',
-      descricao: 'Valores de referência de mensalidade e contraturno reajustados no painel de configurações.',
+      descricao: `Valores de referência de mensalidade e contraturno reajustados para o ano ${year} no painel de configurações.`,
       valorAnterior: 0,
       valorNovo: 0
     };

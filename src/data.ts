@@ -66,11 +66,20 @@ export function getContraturnoPrice(frequencia: number, periodo: 'Parcial' | 'Co
 }
 
 // Get Regular class dynamically from state-managed database prices
-export function getRegularClassForAgeDynamic(age: number, classPricesList: RegularClass[]): RegularClass {
+export function getRegularClassForAgeDynamic(
+  age: number,
+  classPricesList: RegularClass[],
+  year: number = 2026
+): RegularClass {
   if (!classPricesList || classPricesList.length === 0) {
     return getRegularClassForAge(age);
   }
-  const sorted = [...classPricesList].sort((a, b) => a.idadeRef - b.idadeRef);
+  
+  // Filter by year
+  const filtered = classPricesList.filter(c => (c.ano || 2026) === year);
+  const listToUse = filtered.length > 0 ? filtered : classPricesList;
+  
+  const sorted = [...listToUse].sort((a, b) => a.idadeRef - b.idadeRef);
   
   if (age <= 2) return sorted[0];
   if (age === 3) return sorted[1] || sorted[0];
@@ -87,12 +96,18 @@ export function getRegularClassForAgeDynamic(age: number, classPricesList: Regul
 export function getContraturnoPriceDynamic(
   frequencia: number, 
   periodo: 'Parcial' | 'Completo', 
-  contraturnoPricesList: ContraturnoPrice[]
+  contraturnoPricesList: ContraturnoPrice[],
+  year: number = 2026
 ): number {
   if (!contraturnoPricesList || contraturnoPricesList.length === 0) {
     return getContraturnoPrice(frequencia, periodo);
   }
-  const match = contraturnoPricesList.find(cp => cp.frequencia === frequencia);
+  
+  // Filter by year
+  const filtered = contraturnoPricesList.filter(cp => (cp.ano || 2026) === year);
+  const listToUse = filtered.length > 0 ? filtered : contraturnoPricesList;
+
+  const match = listToUse.find(cp => cp.frequencia === frequencia);
   if (match) {
     return periodo === 'Parcial' ? match.valorParcial : match.valorCompleto;
   }
