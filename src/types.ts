@@ -48,6 +48,7 @@ export interface Enrollment {
   valorFinalRegular: number; // valorRegularOriginal - descontoMensal
   statusNegociacao: 'Pendente' | 'Em Negociação' | 'Confirmada' | 'Cancelada';
   anotacoes: string;
+  descontoContraturno?: number;
 }
 
 export interface FinancialMovement {
@@ -58,4 +59,11 @@ export interface FinancialMovement {
   descricao: string;
   valorAnterior: number; // Previous total monthly sum
   valorNovo: number; // New total monthly sum
+}
+
+export interface ContraturnoPrice {
+  id: string;
+  frequencia: number; // 0 is avulso, 1-5 is weekly frequency
+  valorParcial: number;
+  valorCompleto: number;
 }

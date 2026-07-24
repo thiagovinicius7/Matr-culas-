@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
-import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle } from 'lucide-react';
+import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import * as htmlToImage from 'html-to-image';
 
 interface StudentProfileProps {
   students: Student[];
@@ -12,6 +13,7 @@ interface StudentProfileProps {
   movements: FinancialMovement[];
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
+  onNavigateWithStudent?: (tabId: string, studentId: string) => void;
   onAddStudent: (student: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
@@ -27,6 +29,7 @@ export default function StudentProfile({
   movements,
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
+  onNavigateWithStudent,
   onAddStudent,
   onUpdateStudent,
   onDeleteStudent,
@@ -71,6 +74,33 @@ export default function StudentProfile({
   const activeEnrollments = enrollments.filter(e => e.alunoId === selectedStudentId);
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
   const activeMovements = movements.filter(m => m.alunoId === selectedStudentId).sort((a,b) => b.data.localeCompare(a.data));
+
+  const profileRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportImage = async () => {
+    if (!profileRef.current || !activeStudent) return;
+    setIsExporting(true);
+    try {
+      const dataUrl = await htmlToImage.toPng(profileRef.current, {
+        backgroundColor: '#FDFBF7', // match brand-cream perfectly
+        style: {
+          padding: '24px',
+          borderRadius: '12px',
+        },
+        pixelRatio: 2
+      });
+      const link = document.createElement('a');
+      link.download = `Ficha_${activeStudent.nome.replace(/\s+/g, '_')}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error('Erro ao gerar imagem da ficha:', error);
+      alert('Não foi possível gerar a imagem da ficha.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Age calculations
   const currentAge = activeStudent ? calculateAgeAtCutoff(activeStudent.nascimento, 2026) : 0;
@@ -531,6 +561,7 @@ export default function StudentProfile({
             /* COMPREHENSIVE STUDENT DETAILS (FICHA) */
             <motion.div
               key="student-ficha-details"
+              ref={profileRef}
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
@@ -584,6 +615,25 @@ export default function StudentProfile({
                       Inscrito no Sítio em: {new Date(activeStudent.dataEntrada + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </p>
                   </div>
+                </div>
+
+                {/* Direct Actions bar requested by user */}
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2" id="student-profile-actions-bar">
+                  <button
+                    onClick={() => onNavigateWithStudent?.('negotiation', activeStudent.id)}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Calculator size={13} />
+                    Ir para Calculadora de Acordo
+                  </button>
+                  <button
+                    onClick={handleExportImage}
+                    disabled={isExporting}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <FileImage size={13} />
+                    {isExporting ? 'Gerando Imagem...' : 'Gerar Imagem para Enviar'}
+                  </button>
                 </div>
 
                 {activeStudent.observacoes && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, ContraturnoNature, ContraturnoPeriod } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, getContraturnoPrice } from '../data';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, ContraturnoNature, ContraturnoPeriod, RegularClass, ContraturnoPrice } from '../types';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic } from '../data';
 import { Calculator, CheckCircle2, Shield, AlertTriangle, Sparkles, FileText, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -9,6 +9,8 @@ interface NegotiationCalcProps {
   guardians: Guardian[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
+  classPrices: RegularClass[];
+  contraturnoPrices: ContraturnoPrice[];
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onConfirmNegotiation: (
@@ -23,6 +25,8 @@ export default function NegotiationCalc({
   guardians,
   enrollments,
   contraturnos,
+  classPrices,
+  contraturnoPrices,
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
   onConfirmNegotiation
@@ -37,6 +41,7 @@ export default function NegotiationCalc({
   
   // Negotiation states
   const [discountVal, setDiscountVal] = useState<number>(0);
+  const [contraturnoDiscountVal, setContraturnoDiscountVal] = useState<number>(0);
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
 
@@ -53,7 +58,7 @@ export default function NegotiationCalc({
   const financialGuardian = guardians.find(g => g.alunoId === selectedStudentId && g.financeiro);
 
   const studentAge = selectedStudent ? calculateAgeAtCutoff(selectedStudent.nascimento, 2026) : 0;
-  const regularClass = selectedStudent ? getRegularClassForAge(studentAge) : null;
+  const regularClass = selectedStudent ? getRegularClassForAgeDynamic(studentAge, classPrices) : null;
 
   // Derive contraturno nature based on student age
   // "Melaço até 4 anos, Marmelada acima de 5 anos"
@@ -64,9 +69,10 @@ export default function NegotiationCalc({
   const regularWithDiscount = Math.max(0, regularBasePrice - discountVal);
 
   const weeklyFrequency = selectedDays.length;
-  const contraturnoPrice = enableContraturno ? getContraturnoPrice(weeklyFrequency, contraturnoPeriod) : 0;
+  const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices) : 0;
+  const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
 
-  const totalMonthlyCommitment = regularWithDiscount + contraturnoPrice;
+  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted;
 
   // Auto-fill existing negotiation if student changes
   useEffect(() => {
@@ -74,10 +80,12 @@ export default function NegotiationCalc({
       const existing = enrollments.find(e => e.alunoId === selectedStudentId);
       if (existing) {
         setDiscountVal(existing.descontoMensal);
+        setContraturnoDiscountVal(existing.descontoContraturno || 0);
         setNegotiationStatus(existing.statusNegociacao);
         setNotes(existing.anotacoes);
       } else {
         setDiscountVal(0);
+        setContraturnoDiscountVal(0);
         setNegotiationStatus('Em Negociação');
         setNotes('');
       }
@@ -118,7 +126,8 @@ export default function NegotiationCalc({
       descontoMensal: discountVal,
       valorFinalRegular: regularWithDiscount,
       statusNegociacao: negotiationStatus,
-      anotacoes: notes
+      anotacoes: notes,
+      descontoContraturno: contraturnoDiscountVal
     };
 
     const contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null = enableContraturno && weeklyFrequency > 0 ? {
@@ -127,7 +136,7 @@ export default function NegotiationCalc({
       natureza: contraturnoNature,
       diasSemana: selectedDays,
       periodo: contraturnoPeriod,
-      valorMensal: contraturnoPrice
+      valorMensal: contraturnoDiscounted
     } : null;
 
     onConfirmNegotiation(selectedStudentId, enrollmentData, contraturnoData);
@@ -306,6 +315,24 @@ export default function NegotiationCalc({
                           </label>
                         </div>
                       </div>
+
+                      {/* Contraturno discount field */}
+                      <div className="space-y-1 pt-2 border-t border-slate-200">
+                        <label className="text-xs font-bold text-slate-600 block">Conceder Desconto Contraturno (R$)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-mono">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={contraturnoPrice}
+                            value={contraturnoDiscountVal || ''}
+                            onChange={(e) => setContraturnoDiscountVal(Number(e.target.value))}
+                            className="w-full text-xs pl-8 pr-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white"
+                            placeholder="0"
+                          />
+                        </div>
+                        <p className="text-[9px] text-slate-400">Desconto mensal aplicado exclusivamente à mensalidade do Contraturno.</p>
+                      </div>
                     </motion.div>
                   )}
                 </div>
@@ -384,11 +411,27 @@ export default function NegotiationCalc({
 
                   {/* Contraturno */}
                   {enableContraturno && weeklyFrequency > 0 && (
-                    <div className="flex justify-between text-xs text-slate-700 pt-1 border-t border-dashed border-slate-100">
-                      <span>Contraturno {contraturnoNature} ({weeklyFrequency} dias - {contraturnoPeriod}):</span>
-                      <span className="font-mono font-bold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contraturnoPrice)}
-                      </span>
+                    <div className="pt-1 border-t border-dashed border-slate-100 space-y-1">
+                      <div className="flex justify-between text-xs text-slate-700">
+                        <span>Contraturno {contraturnoNature} ({weeklyFrequency} dias - {contraturnoPeriod}):</span>
+                        <span className="font-mono font-bold">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contraturnoPrice)}
+                        </span>
+                      </div>
+                      {contraturnoDiscountVal > 0 && (
+                        <div className="flex justify-between text-xs text-rose-600">
+                          <span>Desconto Contraturno:</span>
+                          <span className="font-mono font-bold">
+                            -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contraturnoDiscountVal)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-[11px] font-bold text-slate-500 pt-0.5">
+                        <span>Subtotal Contraturno:</span>
+                        <span className="font-mono text-slate-700">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contraturnoDiscounted)}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>

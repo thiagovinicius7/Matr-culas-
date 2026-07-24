@@ -1,4 +1,4 @@
-import { Student, Guardian, RegularClass, ContraturnoSegment, Enrollment, FinancialMovement } from './types';
+import { Student, Guardian, RegularClass, ContraturnoSegment, Enrollment, FinancialMovement, ContraturnoPrice } from './types';
 
 // Catalog of Regular Classes (Bee names theme - Sítio-escola native stingless bees)
 export const REGULAR_CLASSES: RegularClass[] = [
@@ -63,6 +63,40 @@ export function getContraturnoPrice(frequencia: number, periodo: 'Parcial' | 'Co
   };
   
   return pricingTable[frequencia]?.[periodo] || 0;
+}
+
+// Get Regular class dynamically from state-managed database prices
+export function getRegularClassForAgeDynamic(age: number, classPricesList: RegularClass[]): RegularClass {
+  if (!classPricesList || classPricesList.length === 0) {
+    return getRegularClassForAge(age);
+  }
+  const sorted = [...classPricesList].sort((a, b) => a.idadeRef - b.idadeRef);
+  
+  if (age <= 2) return sorted[0];
+  if (age === 3) return sorted[1] || sorted[0];
+  if (age === 4) return sorted[2] || sorted[0];
+  if (age === 5) return sorted[3] || sorted[sorted.length - 1];
+  if (age === 6) return sorted[4] || sorted[sorted.length - 1];
+  if (age === 7) return sorted[5] || sorted[sorted.length - 1];
+  if (age === 8) return sorted[6] || sorted[sorted.length - 1];
+  if (age === 9) return sorted[7] || sorted[sorted.length - 1];
+  return sorted[8] || sorted[sorted.length - 1];
+}
+
+// Get Contraturno price dynamically from state-managed database prices
+export function getContraturnoPriceDynamic(
+  frequencia: number, 
+  periodo: 'Parcial' | 'Completo', 
+  contraturnoPricesList: ContraturnoPrice[]
+): number {
+  if (!contraturnoPricesList || contraturnoPricesList.length === 0) {
+    return getContraturnoPrice(frequencia, periodo);
+  }
+  const match = contraturnoPricesList.find(cp => cp.frequencia === frequencia);
+  if (match) {
+    return periodo === 'Parcial' ? match.valorParcial : match.valorCompleto;
+  }
+  return getContraturnoPrice(frequencia, periodo);
 }
 
 // Pre-seeded Student Database

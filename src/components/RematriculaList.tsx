@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment } from '../types';
-import { REGULAR_CLASSES } from '../data';
-import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit, Check } from 'lucide-react';
+import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic } from '../data';
+import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface RematriculaListProps {
@@ -9,9 +9,12 @@ interface RematriculaListProps {
   guardians: Guardian[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
+  classPrices: RegularClass[];
+  contraturnoPrices: ContraturnoPrice[];
   preselectedStudentId?: string;
   onUpdateEnrollmentStatus: (alunoId: string, status: Enrollment['statusNegociacao']) => void;
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
+  onUpdateEnrollmentDiscounts: (alunoId: string, discountRegular: number, discountContraturno: number) => void;
 }
 
 export default function RematriculaList({
@@ -19,12 +22,19 @@ export default function RematriculaList({
   guardians,
   enrollments,
   contraturnos,
+  classPrices,
+  contraturnoPrices,
   preselectedStudentId,
   onUpdateEnrollmentStatus,
-  onUpdateEnrollmentNotes
+  onUpdateEnrollmentNotes,
+  onUpdateEnrollmentDiscounts
 }: RematriculaListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [editingDiscountId, setEditingDiscountId] = useState<string | null>(null);
+  const [tempDiscountRegular, setTempDiscountRegular] = useState<number>(0);
+  const [tempDiscountContraturno, setTempDiscountContraturno] = useState<number>(0);
 
   useEffect(() => {
     if (preselectedStudentId) {
@@ -47,7 +57,7 @@ export default function RematriculaList({
   const rematriculaData = enrollments.map(e => {
     const student = students.find(s => s.id === e.alunoId);
     const financialGuardian = guardians.find(g => g.alunoId === e.alunoId && g.financeiro);
-    const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+    const regularClass = classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
     
     // Check if they have an active contraturno
     const activeCont = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
@@ -221,16 +231,98 @@ export default function RematriculaList({
 
                     {/* Price Comparison Column */}
                     <td className="p-3">
-                      <div className="space-y-0.5">
-                        <div className="flex justify-between max-w-[150px] text-[10px] text-slate-400">
-                          <span>Base Regular:</span>
-                          <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.valorRegularOriginal)}</span>
+                      {editingDiscountId === enrollment.id ? (
+                        <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-md max-w-[200px]" id={`discount-editor-${enrollment.id}`}>
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Desc. Regular (R$)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={enrollment.valorRegularOriginal}
+                              value={tempDiscountRegular}
+                              onChange={(e) => setTempDiscountRegular(Number(e.target.value))}
+                              className="w-full text-xs font-mono px-2 py-0.5 border border-slate-200 rounded bg-white"
+                            />
+                          </div>
+
+                          {activeContraturno && (
+                            <div className="space-y-1">
+                              <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Desc. Contraturno (R$)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={tempDiscountContraturno}
+                                onChange={(e) => setTempDiscountContraturno(Number(e.target.value))}
+                                className="w-full text-xs font-mono px-2 py-0.5 border border-slate-200 rounded bg-white"
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex justify-end gap-1.5 pt-1">
+                            <button
+                              onClick={() => setEditingDiscountId(null)}
+                              className="p-1 text-slate-400 hover:text-slate-600 rounded bg-white border border-slate-200 cursor-pointer"
+                              title="Cancelar"
+                            >
+                              <X size={10} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                onUpdateEnrollmentDiscounts(student.id, tempDiscountRegular, tempDiscountContraturno);
+                                setEditingDiscountId(null);
+                              }}
+                              className="p-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 cursor-pointer"
+                              title="Salvar"
+                            >
+                              <Check size={10} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex justify-between max-w-[150px] font-bold text-slate-900 text-xs">
-                          <span>Negociado:</span>
-                          <span className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalNegotiatedMonthly)}</span>
+                      ) : (
+                        <div className="space-y-0.5 group">
+                          <div className="flex justify-between max-w-[150px] text-[10px] text-slate-400">
+                            <span>Base Regular:</span>
+                            <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.valorRegularOriginal)}</span>
+                          </div>
+                          {enrollment.descontoMensal > 0 && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-rose-500">
+                              <span>Desc. Regular:</span>
+                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.descontoMensal)}</span>
+                            </div>
+                          )}
+                          {activeContraturno && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-slate-400">
+                              <span>Base Contraturno:</span>
+                              <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                getContraturnoPriceDynamic(activeContraturno.diasSemana.length, activeContraturno.periodo, contraturnoPrices)
+                              )}</span>
+                            </div>
+                          )}
+                          {activeContraturno && (enrollment.descontoContraturno || 0) > 0 && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-rose-500">
+                              <span>Desc. Contraturno:</span>
+                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.descontoContraturno || 0)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center max-w-[150px] font-bold text-slate-900 text-xs">
+                            <span>Total Mensal:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalNegotiatedMonthly)}</span>
+                              <button
+                                onClick={() => {
+                                  setEditingDiscountId(enrollment.id);
+                                  setTempDiscountRegular(enrollment.descontoMensal);
+                                  setTempDiscountContraturno(enrollment.descontoContraturno || 0);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
+                                title="Editar descontos"
+                              >
+                                <Edit2 size={10} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </td>
 
                     {/* Annotations Column */}
@@ -261,7 +353,7 @@ export default function RematriculaList({
                             className="p-0.5 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer"
                             title="Editar anotação"
                           >
-                            <Edit size={12} />
+                            <Edit2 size={12} />
                           </button>
                         </div>
                       )}

@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement } from './types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice } from './types';
 import { 
   calculateAgeAtCutoff,
-  getRegularClassForAge
+  getRegularClassForAge,
+  REGULAR_CLASSES
 } from './data';
 import {
   seedDatabaseIfEmpty,
@@ -27,7 +28,8 @@ import StudentProfile from './components/StudentProfile';
 import NegotiationCalc from './components/NegotiationCalc';
 import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X } from 'lucide-react';
+import PricingSettings from './components/PricingSettings';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -41,6 +43,10 @@ export default function App() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [contraturnos, setContraturnos] = useState<ContraturnoSegment[]>([]);
   const [movements, setMovements] = useState<FinancialMovement[]>([]);
+  
+  // Custom Pricing States
+  const [classPrices, setClassPrices] = useState<RegularClass[]>([]);
+  const [contraturnoPrices, setContraturnoPrices] = useState<ContraturnoPrice[]>([]);
 
   // Selected student ID shared across components
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -54,12 +60,22 @@ export default function App() {
         await seedDatabaseIfEmpty();
         
         // Fetch all
-        const [loadedStudents, loadedGuardians, loadedEnrollments, loadedContraturnos, loadedMovements] = await Promise.all([
+        const [
+          loadedStudents, 
+          loadedGuardians, 
+          loadedEnrollments, 
+          loadedContraturnos, 
+          loadedMovements,
+          loadedClassPrices,
+          loadedContraturnoPrices
+        ] = await Promise.all([
           getCollectionData<Student>('students'),
           getCollectionData<Guardian>('guardians'),
           getCollectionData<Enrollment>('enrollments'),
           getCollectionData<ContraturnoSegment>('contraturnos'),
-          getCollectionData<FinancialMovement>('movements')
+          getCollectionData<FinancialMovement>('movements'),
+          getCollectionData<RegularClass>('classPrices'),
+          getCollectionData<ContraturnoPrice>('contraturnoPrices')
         ]);
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -68,6 +84,29 @@ export default function App() {
         setEnrollments(loadedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
+
+        // Process and seed custom Class Prices
+        let finalClassPrices = loadedClassPrices;
+        if (!finalClassPrices || finalClassPrices.length === 0) {
+          finalClassPrices = [...REGULAR_CLASSES];
+          await Promise.all(finalClassPrices.map(cp => saveDocument('classPrices', cp)));
+        }
+        setClassPrices(finalClassPrices);
+
+        // Process and seed custom Contraturno Prices
+        let finalContraturnoPrices = loadedContraturnoPrices;
+        if (!finalContraturnoPrices || finalContraturnoPrices.length === 0) {
+          finalContraturnoPrices = [
+            { id: 'avulso', frequencia: 0, valorParcial: 80, valorCompleto: 130 },
+            { id: 'freq_1', frequencia: 1, valorParcial: 300, valorCompleto: 500 },
+            { id: 'freq_2', frequencia: 2, valorParcial: 550, valorCompleto: 900 },
+            { id: 'freq_3', frequencia: 3, valorParcial: 750, valorCompleto: 1250 },
+            { id: 'freq_4', frequencia: 4, valorParcial: 950, valorCompleto: 1550 },
+            { id: 'freq_5', frequencia: 5, valorParcial: 1100, valorCompleto: 1800 }
+          ];
+          await Promise.all(finalContraturnoPrices.map(ctp => saveDocument('contraturnoPrices', ctp)));
+        }
+        setContraturnoPrices(finalContraturnoPrices);
 
         if (sortedStudents.length > 0) {
           setSelectedStudentId(sortedStudents[0].id);
@@ -450,6 +489,77 @@ export default function App() {
     }));
   };
 
+  // Handler: Update Discounts from Worklist directly
+  const handleUpdateEnrollmentDiscounts = (alunoId: string, discountRegular: number, discountContraturno: number) => {
+    setEnrollments(prev => prev.map(e => {
+      if (e.alunoId === alunoId && e.ano === 2026) {
+        const finalRegular = Math.max(0, e.valorRegularOriginal - discountRegular);
+        const updatedEnroll = { 
+          ...e, 
+          descontoMensal: discountRegular, 
+          valorFinalRegular: finalRegular,
+          descontoContraturno: discountContraturno
+        };
+        saveDocument('enrollments', updatedEnroll);
+        return updatedEnroll;
+      }
+      return e;
+    }));
+
+    // Update active contraturno segment valorMensal if present
+    setContraturnos(prev => prev.map(c => {
+      if (c.alunoId === alunoId && c.dataFim === null) {
+        // Match frequency and period to recalculate base
+        const match = contraturnoPrices.find(cp => cp.frequencia === c.diasSemana.length);
+        const basePrice = match ? (c.periodo === 'Parcial' ? match.valorParcial : match.valorCompleto) : c.valorMensal;
+        const finalContraturnoPrice = Math.max(0, basePrice - discountContraturno);
+        const updatedCont = { ...c, valorMensal: finalContraturnoPrice };
+        saveDocument('contraturnos', updatedCont);
+        return updatedCont;
+      }
+      return c;
+    }));
+
+    // Log financial movement
+    const student = students.find(s => s.id === alunoId);
+    if (student) {
+      const movement: FinancialMovement = {
+        id: `mov_disc_${Date.now()}`,
+        alunoId: student.id,
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'Desconto_Alterado',
+        descricao: `Descontos ajustados na lista de trabalho: Regular de R$ ${discountRegular}/mês e Contraturno de R$ ${discountContraturno}/mês.`,
+        valorAnterior: 0,
+        valorNovo: 0
+      };
+      setMovements(prev => [...prev, movement]);
+      saveDocument('movements', movement);
+    }
+  };
+
+  // Handler: Save global pricing configurations
+  const handleSavePrices = async (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[]) => {
+    setClassPrices(updatedClasses);
+    setContraturnoPrices(updatedContraturno);
+    await Promise.all([
+      ...updatedClasses.map(c => saveDocument('classPrices', c)),
+      ...updatedContraturno.map(cp => saveDocument('contraturnoPrices', cp))
+    ]);
+
+    // Create a financial movement log
+    const movement: FinancialMovement = {
+      id: `mov_pricing_${Date.now()}`,
+      alunoId: 'system',
+      data: new Date().toISOString().split('T')[0],
+      tipo: 'Reajuste_Geral',
+      descricao: 'Valores de referência de mensalidade e contraturno reajustados no painel de configurações.',
+      valorAnterior: 0,
+      valorNovo: 0
+    };
+    setMovements(prev => [...prev, movement]);
+    saveDocument('movements', movement);
+  };
+
   const totalStudentsCount = students.length;
   const confirmedEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && e.statusNegociacao === 'Confirmada').length;
   const pendingEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && (e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação')).length;
@@ -497,6 +607,7 @@ export default function App() {
             { id: 'negotiation', label: 'Calculadora de Acordo', icon: Calculator },
             { id: 'rematricula', label: 'Lista de Trabalho', icon: ClipboardList },
             { id: 'escala', label: 'Escala Contraturno', icon: CalendarDays },
+            { id: 'pricing', label: 'Configurar Mensalidades', icon: Settings },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -564,6 +675,7 @@ export default function App() {
                 { id: 'negotiation', label: 'Calculadora de Acordo', icon: Calculator },
                 { id: 'rematricula', label: 'Lista de Trabalho', icon: ClipboardList },
                 { id: 'escala', label: 'Escala Contraturno', icon: CalendarDays },
+                { id: 'pricing', label: 'Configurar Mensalidades', icon: Settings },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -661,6 +773,8 @@ export default function App() {
                   guardians={guardians} 
                   enrollments={enrollments} 
                   contraturnos={contraturnos}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
                   selectedStudentId={selectedStudentId}
                   onSelectStudent={setSelectedStudentId}
                   onConfirmNegotiation={handleConfirmNegotiation}
@@ -672,15 +786,25 @@ export default function App() {
                   guardians={guardians} 
                   enrollments={enrollments} 
                   contraturnos={contraturnos}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
                   preselectedStudentId={selectedStudentId}
                   onUpdateEnrollmentStatus={handleUpdateEnrollmentStatus}
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
+                  onUpdateEnrollmentDiscounts={handleUpdateEnrollmentDiscounts}
                 />
               )}
               {activeTab === 'escala' && (
                 <ContraturnoSchedule 
                   students={students} 
                   contraturnos={contraturnos} 
+                />
+              )}
+              {activeTab === 'pricing' && (
+                <PricingSettings 
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
+                  onSavePrices={handleSavePrices}
                 />
               )}
             </motion.div>
