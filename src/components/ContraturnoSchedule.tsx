@@ -111,38 +111,40 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
           /* MONTHLY MATRIX PRINT */
           <div className="space-y-3">
             <h2 className="text-sm font-bold uppercase tracking-wider">Grade Geral do Contraturno</h2>
-            <table className="w-full text-left border border-slate-300 border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold font-mono">
-                  <th className="p-2 border-r border-slate-300">Estudante</th>
-                  <th className="p-2 border-r border-slate-300">Grupo</th>
-                  <th className="p-2 border-r border-slate-300 text-center">Seg</th>
-                  <th className="p-2 border-r border-slate-300 text-center">Ter</th>
-                  <th className="p-2 border-r border-slate-300 text-center">Qua</th>
-                  <th className="p-2 border-r border-slate-300 text-center">Qui</th>
-                  <th className="p-2 border-r border-slate-300 text-center">Sex</th>
-                  <th className="p-2 text-center">Saída</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-300 text-[10px]">
-                {activeContraturnos.map(c => {
-                  const student = getStudentInfo(c.alunoId);
-                  if (!student) return null;
-                  return (
-                    <tr key={c.id}>
-                      <td className="p-2 border-r border-slate-300 font-semibold">{student.nome}</td>
-                      <td className="p-2 border-r border-slate-300">{c.natureza}</td>
-                      {daysOfWeek.map(day => (
-                        <td key={day} className="p-2 border-r border-slate-300 text-center font-mono">
-                          {c.diasSemana.includes(day) ? 'X' : ''}
-                        </td>
-                      ))}
-                      <td className="p-2 text-center font-medium">{horarioSaida(c.periodo)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left border border-slate-300 border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold font-mono">
+                    <th className="p-2 border-r border-slate-300">Estudante</th>
+                    <th className="p-2 border-r border-slate-300">Grupo</th>
+                    <th className="p-2 border-r border-slate-300 text-center">Seg</th>
+                    <th className="p-2 border-r border-slate-300 text-center">Ter</th>
+                    <th className="p-2 border-r border-slate-300 text-center">Qua</th>
+                    <th className="p-2 border-r border-slate-300 text-center">Qui</th>
+                    <th className="p-2 border-r border-slate-300 text-center">Sex</th>
+                    <th className="p-2 text-center">Saída</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-300 text-[10px]">
+                  {activeContraturnos.map(c => {
+                    const student = getStudentInfo(c.alunoId);
+                    if (!student) return null;
+                    return (
+                      <tr key={c.id}>
+                        <td className="p-2 border-r border-slate-300 font-semibold">{student.nome}</td>
+                        <td className="p-2 border-r border-slate-300">{c.natureza}</td>
+                        {daysOfWeek.map(day => (
+                          <td key={day} className="p-2 border-r border-slate-300 text-center font-mono">
+                            {c.diasSemana.includes(day) ? 'X' : ''}
+                          </td>
+                        ))}
+                        <td className="p-2 text-center font-medium">{horarioSaida(c.periodo)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

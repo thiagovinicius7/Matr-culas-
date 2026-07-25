@@ -29,13 +29,20 @@ import NegotiationCalc from './components/NegotiationCalc';
 import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings } from 'lucide-react';
+import LoginScreen from './components/LoginScreen';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // App Password and Session states
+  const [appPassword, setAppPassword] = useState<string>('456321');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    return sessionStorage.getItem('isLoggedIn') === 'true';
+  });
 
   // Core App States loaded from Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -67,7 +74,8 @@ export default function App() {
           loadedContraturnos, 
           loadedMovements,
           loadedClassPrices,
-          loadedContraturnoPrices
+          loadedContraturnoPrices,
+          loadedSettings
         ] = await Promise.all([
           getCollectionData<Student>('students'),
           getCollectionData<Guardian>('guardians'),
@@ -75,7 +83,8 @@ export default function App() {
           getCollectionData<ContraturnoSegment>('contraturnos'),
           getCollectionData<FinancialMovement>('movements'),
           getCollectionData<RegularClass>('classPrices'),
-          getCollectionData<ContraturnoPrice>('contraturnoPrices')
+          getCollectionData<ContraturnoPrice>('contraturnoPrices'),
+          getCollectionData<{ id: string; value: string }>('settings')
         ]);
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -84,6 +93,12 @@ export default function App() {
         setEnrollments(loadedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
+
+        // Process loaded settings
+        const passwordSetting = (loadedSettings || []).find(s => s.id === 'appPassword');
+        if (passwordSetting && passwordSetting.value) {
+          setAppPassword(passwordSetting.value);
+        }
 
         // Sanitize loaded Class Prices to ensure all have an 'ano' field
         const sanitizedClassPrices = (loadedClassPrices || []).map(cp => {
@@ -846,6 +861,18 @@ export default function App() {
     saveDocument('movements', movement);
   };
 
+  // Handler: Update application security password
+  const handleUpdatePassword = async (newPassword: string) => {
+    setAppPassword(newPassword);
+    await saveDocument('settings', { id: 'appPassword', value: newPassword });
+  };
+
+  // Handler: Logout / Lock session
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    sessionStorage.removeItem('isLoggedIn');
+  };
+
   const totalStudentsCount = students.length;
   const confirmedEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && e.statusNegociacao === 'Confirmada').length;
   const pendingEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && (e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação')).length;
@@ -868,6 +895,18 @@ export default function App() {
           <p className="text-[10px] text-slate-400 italic">"Conectando à base de dados na nuvem..."</p>
         </div>
       </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <LoginScreen 
+        expectedPassword={appPassword} 
+        onLoginSuccess={() => {
+          setIsLoggedIn(true);
+          sessionStorage.setItem('isLoggedIn', 'true');
+        }} 
+      />
     );
   }
 
@@ -915,7 +954,7 @@ export default function App() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-emerald-900/30 shrink-0">
+        <div className="p-4 border-t border-emerald-900/30 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-brand-orange flex items-center justify-center text-white font-bold text-xs uppercase shadow-xs">
               SG
@@ -925,6 +964,13 @@ export default function App() {
               <div className="text-[10px] text-emerald-300">Sítio-escola</div>
             </div>
           </div>
+          <button 
+            onClick={handleLogout}
+            className="p-1.5 text-emerald-300 hover:text-white hover:bg-brand-green-light/20 rounded-md transition-colors cursor-pointer"
+            title="Bloquear Acesso"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </aside>
 
@@ -983,12 +1029,22 @@ export default function App() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-all text-rose-300 hover:bg-rose-950/40 border-t border-emerald-900/20 mt-1"
+              >
+                <LogOut size={14} className="text-rose-400" />
+                Sair do Sistema (Bloquear)
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Global Statistics / Top Header inside Main Content */}
-        <header className="bg-white border-b border-[#FAF9F5] py-3 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0" id="main-header">
+        <header className="bg-white border-b border-[#FAF9F5] py-2 md:py-3 px-4 md:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0" id="main-header">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2 font-display">
             <div>
               <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total Alunos</p>
@@ -1095,6 +1151,8 @@ export default function App() {
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   onSavePrices={handleSavePrices}
+                  appPassword={appPassword}
+                  onUpdatePassword={handleUpdatePassword}
                 />
               )}
             </motion.div>

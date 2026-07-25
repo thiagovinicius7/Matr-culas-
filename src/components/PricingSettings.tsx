@@ -8,12 +8,16 @@ interface PricingSettingsProps {
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
   onSavePrices: (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => void;
+  appPassword?: string;
+  onUpdatePassword?: (newPassword: string) => Promise<void>;
 }
 
 export default function PricingSettings({
   classPrices,
   contraturnoPrices,
-  onSavePrices
+  onSavePrices,
+  appPassword,
+  onUpdatePassword
 }: PricingSettingsProps) {
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [customYears, setCustomYears] = useState<number[]>([]);
@@ -24,6 +28,12 @@ export default function PricingSettings({
   const [localClasses, setLocalClasses] = useState<RegularClass[]>([]);
   const [localContraturno, setLocalContraturno] = useState<ContraturnoPrice[]>([]);
   const [isSaved, setIsSaved] = useState(false);
+
+  // Password fields state
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Derive available years
   const availableYears = Array.from(
@@ -147,6 +157,31 @@ export default function PricingSettings({
     onSavePrices(localClasses, localContraturno, selectedYear);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 4000);
+  };
+
+  const handleUpdatePasswordClick = async () => {
+    if (!newPasswordInput) {
+      setPasswordError('A nova senha não pode ser vazia.');
+      return;
+    }
+    if (newPasswordInput.length < 4) {
+      setPasswordError('A nova senha deve ter pelo menos 4 dígitos.');
+      return;
+    }
+    try {
+      setIsUpdatingPassword(true);
+      setPasswordError(null);
+      setPasswordSuccess(null);
+      if (onUpdatePassword) {
+        await onUpdatePassword(newPasswordInput);
+      }
+      setPasswordSuccess('Senha de acesso do aplicativo atualizada com sucesso!');
+      setNewPasswordInput('');
+    } catch (err) {
+      setPasswordError('Ocorreu um erro ao atualizar a senha no banco de dados.');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const handleRestoreDefaults = () => {
@@ -455,6 +490,62 @@ export default function PricingSettings({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Security settings section */}
+      <div className="bg-white p-5 rounded-lg border border-slate-200 space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+          <Shield size={16} className="text-brand-orange" />
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            Segurança do Aplicativo (Senha de Acesso)
+          </h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Senha de Acesso Ativa</label>
+            <div className="bg-slate-50 text-xs px-3 py-2 border border-slate-200 rounded-md font-mono select-none text-slate-600 flex justify-between items-center">
+              <span>••••••</span>
+              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded uppercase font-sans font-bold">Protegido</span>
+            </div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Definir Nova Senha</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Digite apenas números"
+                value={newPasswordInput}
+                onChange={(e) => {
+                  setNewPasswordInput(e.target.value.replace(/\D/g, ''));
+                  setPasswordSuccess(null);
+                  setPasswordError(null);
+                }}
+                className="text-xs px-3 py-2 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none flex-1 font-mono font-bold"
+              />
+              <button
+                onClick={handleUpdatePasswordClick}
+                disabled={isUpdatingPassword || !newPasswordInput}
+                className="px-4 py-2 bg-brand-green-dark hover:bg-brand-green-light disabled:bg-slate-300 text-white text-xs font-bold rounded-md cursor-pointer transition-colors whitespace-nowrap"
+              >
+                {isUpdatingPassword ? 'Gravando...' : 'Alterar Senha'}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        {passwordError && (
+          <p className="text-[10px] text-rose-600 font-semibold">{passwordError}</p>
+        )}
+        {passwordSuccess && (
+          <p className="text-[10px] text-emerald-600 font-semibold">{passwordSuccess}</p>
+        )}
+        <p className="text-[10px] text-slate-400 italic">
+          Nota: Esta senha protege todo o ecossistema do gestor escolar. Ao alterá-la, ela será salva na nuvem e será exigida imediatamente no próximo acesso de qualquer dispositivo.
+        </p>
       </div>
 
       {/* Safety Notice block */}

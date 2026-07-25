@@ -150,6 +150,10 @@ service cloud.firestore {
       allow delete: if isValidId(contraturnoPriceId);
     }
 
+    match /settings/{settingsId} {
+      allow read, write: if true;
+    }
+
     match /test/{testId} {
       allow read, write: if true;
     }
