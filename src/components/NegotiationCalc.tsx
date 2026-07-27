@@ -41,6 +41,7 @@ export default function NegotiationCalc({
   }, [propSelectedStudentId]);
   
   // Negotiation states
+  const [includeRegular, setIncludeRegular] = useState<boolean>(true);
   const [discountType, setDiscountType] = useState<'reais' | 'porcentagem'>('reais');
   const [discountInput, setDiscountInput] = useState<number>(0);
 
@@ -81,7 +82,7 @@ export default function NegotiationCalc({
   const existingEnrollment = selectedStudent ? enrollments.find(e => e.alunoId === selectedStudent.id && e.ano === selectedYear) : null;
   const currentTurmaRegularId = existingEnrollment ? existingEnrollment.turmaRegularId : null;
   const regularClass = selectedStudent 
-    ? (currentTurmaRegularId 
+    ? (currentTurmaRegularId && currentTurmaRegularId !== 'sem_regular'
         ? (classPrices.find(c => c.id === currentTurmaRegularId) || getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
         : getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
     : null;
@@ -91,14 +92,16 @@ export default function NegotiationCalc({
   const contraturnoNature: ContraturnoNature = studentAge <= 4 ? 'Melaço' : 'Marmelada';
 
   // Pricing calculations
-  const regularBasePrice = regularClass ? regularClass.valorMensal : 0;
+  const regularBasePrice = (includeRegular && regularClass) ? regularClass.valorMensal : 0;
 
   // Calculate discount value in Reais
-  const discountVal = discountType === 'porcentagem'
-    ? Number((regularBasePrice * (discountInput / 100)).toFixed(2))
-    : discountInput;
+  const discountVal = includeRegular
+    ? (discountType === 'porcentagem'
+        ? Number((regularBasePrice * (discountInput / 100)).toFixed(2))
+        : discountInput)
+    : 0;
 
-  const regularWithDiscount = Math.max(0, regularBasePrice - discountVal);
+  const regularWithDiscount = includeRegular ? Math.max(0, regularBasePrice - discountVal) : 0;
 
   const weeklyFrequency = selectedDays.length;
   const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices, selectedYear) : 0;
@@ -110,13 +113,14 @@ export default function NegotiationCalc({
 
   const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
 
-  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted + (addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0);
+  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted + ((includeRegular && addLanche && regularClass?.natureza === 'Fundamental') ? lancheValue : 0);
 
   // Auto-fill existing negotiation if student changes or selected year changes
   useEffect(() => {
     if (selectedStudentId) {
       const existing = enrollments.find(e => e.alunoId === selectedStudentId && e.ano === selectedYear);
       if (existing) {
+        setIncludeRegular(existing.turmaRegularId !== 'sem_regular');
         setDiscountType(existing.tipoDescontoRegular || 'reais');
         setDiscountInput(existing.valorDescontoRegularInput !== undefined ? existing.valorDescontoRegularInput : existing.descontoMensal);
         setContraturnoDiscountType(existing.tipoDescontoContraturno || 'reais');
@@ -127,6 +131,7 @@ export default function NegotiationCalc({
         setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 200);
         setDescontoPontualidade(existing.descontoPontualidade !== undefined ? existing.descontoPontualidade : false);
       } else {
+        setIncludeRegular(true);
         setDiscountType('reais');
         setDiscountInput(0);
         setContraturnoDiscountType('reais');
@@ -169,10 +174,10 @@ export default function NegotiationCalc({
 
     const enrollmentData: Omit<Enrollment, 'id' | 'alunoId'> = {
       ano: selectedYear,
-      turmaRegularId: regularClass!.id,
-      valorRegularOriginal: regularBasePrice,
-      descontoMensal: discountVal,
-      valorFinalRegular: regularWithDiscount,
+      turmaRegularId: includeRegular ? (regularClass?.id || 'sem_regular') : 'sem_regular',
+      valorRegularOriginal: includeRegular ? regularBasePrice : 0,
+      descontoMensal: includeRegular ? discountVal : 0,
+      valorFinalRegular: includeRegular ? regularWithDiscount : 0,
       statusNegociacao: negotiationStatus,
       anotacoes: notes,
       descontoContraturno: contraturnoDiscountVal,
@@ -180,8 +185,8 @@ export default function NegotiationCalc({
       valorDescontoRegularInput: discountInput,
       tipoDescontoContraturno: contraturnoDiscountType,
       valorDescontoContraturnoInput: contraturnoDiscountInput,
-      adicionarLanche: addLanche && regularClass?.natureza === 'Fundamental',
-      valorLanche: addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0,
+      adicionarLanche: includeRegular && addLanche && regularClass?.natureza === 'Fundamental',
+      valorLanche: includeRegular && addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0,
       descontoPontualidade: descontoPontualidade
     };
 
@@ -258,19 +263,66 @@ export default function NegotiationCalc({
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4"
               >
-                {/* Regular Class locked info */}
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Turma Regular Designada</span>
-                    <h4 className="text-xs font-bold text-slate-800 mt-0.5">{regularClass?.nome}</h4>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Determinado por nascimento: {studentAge} anos em 31/03.</p>
-                  </div>
-                  <div className="sm:text-right flex flex-col justify-center sm:items-end">
-                    <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Preço Base Regular</span>
-                    <span className="text-xs font-bold text-slate-900 mt-0.5">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(regularBasePrice)}/mês
+                {/* Regular Class locked info & mode toggle */}
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      1. Modalidade de Matrícula
                     </span>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                        <input
+                          type="radio"
+                          name="includeRegularToggle"
+                          checked={includeRegular}
+                          onChange={() => setIncludeRegular(true)}
+                          className="w-3.5 h-3.5 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>Ensino Regular (+ Contraturno)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                        <input
+                          type="radio"
+                          name="includeRegularToggle"
+                          checked={!includeRegular}
+                          onChange={() => {
+                            setIncludeRegular(false);
+                            setEnableContraturno(true);
+                          }}
+                          className="w-3.5 h-3.5 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="font-bold text-orange-900 bg-orange-100/80 px-2 py-0.5 rounded border border-orange-200">
+                          Somente Contraturno
+                        </span>
+                      </label>
+                    </div>
                   </div>
+
+                  {includeRegular ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Turma Regular Designada</span>
+                        <h4 className="text-xs font-bold text-slate-800 mt-0.5">{regularClass?.nome}</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Determinado por nascimento: {studentAge} anos em 31/03.</p>
+                      </div>
+                      <div className="sm:text-right flex flex-col justify-center sm:items-end">
+                        <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Preço Base Regular</span>
+                        <span className="text-xs font-bold text-slate-900 mt-0.5">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(regularBasePrice)}/mês
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-orange-50/80 border border-orange-200 rounded-md text-xs text-orange-950 flex items-start gap-2">
+                      <Sparkles size={16} className="text-orange-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold block">Matrícula Exclusiva de Contraturno</span>
+                        <span className="text-[11px] text-orange-850">
+                          Aluno matriculado exclusivamente no Contraturno. Isento das mensalidades do ensino regular (Base: R$ 0,00).
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Option to add snack fee for Fundamental class */}

@@ -15,7 +15,7 @@ interface StudentProfileProps {
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
-  onAddStudent: (student: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]) => void;
+  onAddStudent: (student: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[], somenteContraturno?: boolean) => void;
   onUpdateStudent: (student: Student) => void;
   onDeleteStudent: (id: string) => void;
   onAddGuardian: (guardian: Omit<Guardian, 'id'>) => void;
@@ -61,6 +61,7 @@ export default function StudentProfile({
   const [formNascimento, setFormNascimento] = useState('');
   const [formObservacoes, setFormObservacoes] = useState('');
   const [formStatus, setFormStatus] = useState<'ativo' | 'inativo'>('ativo');
+  const [formSomenteContraturno, setFormSomenteContraturno] = useState(false);
   
   // Guardians list during student creation
   const [tempGuardians, setTempGuardians] = useState<Omit<Guardian, 'id' | 'alunoId'>[]>([
@@ -176,6 +177,7 @@ export default function StudentProfile({
     setFormNascimento('');
     setFormObservacoes('');
     setFormStatus('ativo');
+    setFormSomenteContraturno(false);
     setTempGuardians([{ nome: '', parentesco: 'Mãe', contato: '', financeiro: true }]);
     setIsAddingStudent(true);
     setMobileDetailOpen(true);
@@ -210,7 +212,7 @@ export default function StudentProfile({
       validTempGuardians[0].financeiro = true;
     }
 
-    onAddStudent(newStudent, validTempGuardians);
+    onAddStudent(newStudent, validTempGuardians, formSomenteContraturno);
     setSelectedStudentId(newStudent.id);
     setIsAddingStudent(false);
   };
@@ -407,6 +409,34 @@ export default function StudentProfile({
                       className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none"
                     />
                     <p className="text-[10px] text-slate-400">A data de corte para determinação de turma é 31/03.</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-md border border-slate-200 space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 block">Modalidade de Matrícula Inicial</label>
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <label className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="modalidadeMatricula"
+                        checked={!formSomenteContraturno}
+                        onChange={() => setFormSomenteContraturno(false)}
+                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Ensino Regular (+ Contraturno opcional)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer">
+                      <input
+                        type="radio"
+                        name="modalidadeMatricula"
+                        checked={formSomenteContraturno}
+                        onChange={() => setFormSomenteContraturno(true)}
+                        className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="font-bold text-orange-900 bg-orange-100/80 px-2 py-0.5 rounded border border-orange-200">
+                        Somente Contraturno (sem Ensino Regular)
+                      </span>
+                    </label>
                   </div>
                 </div>
 
@@ -920,15 +950,22 @@ export default function StudentProfile({
 
                   {activeEnrollments.length > 0 ? (
                     activeEnrollments.map((e) => {
-                      const regularClass = classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId) || suggestedClass;
+                      const isOnlyContraturno = e.turmaRegularId === 'sem_regular';
+                      const regularClass = isOnlyContraturno 
+                        ? null 
+                        : (classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId) || suggestedClass);
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
                             <div className="flex justify-between items-center">
                               <span className="text-xs font-bold text-slate-700">Turma de Matrícula</span>
                               {!isOverridingClass ? (
-                                <span className="text-xs font-mono font-bold bg-white text-emerald-800 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                                  {regularClass?.nome || 'Nenhuma'}
+                                <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-md border ${
+                                  isOnlyContraturno 
+                                    ? 'bg-amber-50 text-amber-900 border-amber-200' 
+                                    : 'bg-white text-emerald-800 border-emerald-200'
+                                }`}>
+                                  {isOnlyContraturno ? 'Somente Contraturno (Isento do Regular)' : (regularClass?.nome || 'Nenhuma')}
                                 </span>
                               ) : (
                                 <select
@@ -936,6 +973,7 @@ export default function StudentProfile({
                                   onChange={(evt) => setOverrideClassId(evt.target.value)}
                                   className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md focus:outline-none"
                                 >
+                                  <option value="sem_regular">Somente Contraturno (Isento do Regular)</option>
                                   {(classPrices.length > 0 ? classPrices : REGULAR_CLASSES).map((cls) => (
                                     <option key={cls.id} value={cls.id}>
                                       {cls.nome} (R$ {cls.valorMensal})

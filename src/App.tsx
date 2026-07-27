@@ -384,7 +384,11 @@ export default function App() {
   };
 
   // Handler: Add new student with guardians
-  const handleAddStudent = (newStudent: Student, guardiansList: Omit<Guardian, 'id' | 'alunoId'>[]) => {
+  const handleAddStudent = (
+    newStudent: Student, 
+    guardiansList: Omit<Guardian, 'id' | 'alunoId'>[],
+    somenteContraturno?: boolean
+  ) => {
     // 1. Add student
     setStudents(prev => [...prev, newStudent].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     saveDocument('students', newStudent);
@@ -401,18 +405,21 @@ export default function App() {
     // 3. Auto-calculate regular class based on birthdate
     const age = calculateAgeAtCutoff(newStudent.nascimento, 2026);
     const regularClass = getRegularClassForAge(age);
+    const isOnlyContraturno = Boolean(somenteContraturno);
 
     // 4. Create initial Enrollment for 2026 (Pendente by default)
     const newEnrollment: Enrollment = {
       id: `enroll_${Date.now()}`,
       alunoId: newStudent.id,
       ano: 2026,
-      turmaRegularId: regularClass.id,
-      valorRegularOriginal: regularClass.valorMensal,
+      turmaRegularId: isOnlyContraturno ? 'sem_regular' : regularClass.id,
+      valorRegularOriginal: isOnlyContraturno ? 0 : regularClass.valorMensal,
       descontoMensal: 0,
-      valorFinalRegular: regularClass.valorMensal,
+      valorFinalRegular: isOnlyContraturno ? 0 : regularClass.valorMensal,
       statusNegociacao: 'Pendente',
-      anotacoes: 'Matrícula criada automaticamente no cadastro do aluno.'
+      anotacoes: isOnlyContraturno
+        ? 'Matrícula cadastrada exclusivamente no Contraturno (sem ensino regular).'
+        : 'Matrícula criada automaticamente no cadastro do aluno.'
     };
     setEnrollments(prev => [...prev, newEnrollment]);
     saveDocument('enrollments', newEnrollment);
@@ -423,9 +430,11 @@ export default function App() {
       alunoId: newStudent.id,
       data: new Date().toISOString().split('T')[0],
       tipo: 'Matrícula',
-      descricao: `Início do processo de rematrícula para 2026 na turma determinada ${regularClass.nome} (Base: R$ ${regularClass.valorMensal}/mês).`,
+      descricao: isOnlyContraturno
+        ? 'Início do processo de matrícula - Exclusivamente Contraturno (Isento do Ensino Regular).'
+        : `Início do processo de rematrícula para 2026 na turma determinada ${regularClass.nome} (Base: R$ ${regularClass.valorMensal}/mês).`,
       valorAnterior: 0,
-      valorNovo: regularClass.valorMensal
+      valorNovo: isOnlyContraturno ? 0 : regularClass.valorMensal
     };
     setMovements(prev => [...prev, initialMovement]);
     saveDocument('movements', initialMovement);
@@ -443,7 +452,7 @@ export default function App() {
       const regularClass = getRegularClassForAge(age);
 
       setEnrollments(prev => prev.map(e => {
-        if (e.alunoId === updatedStudent.id && e.ano === 2026) {
+        if (e.alunoId === updatedStudent.id && e.ano === 2026 && e.turmaRegularId !== 'sem_regular') {
           const valorFinal = Math.max(0, regularClass.valorMensal - e.descontoMensal);
           const updatedEnroll = {
             ...e,

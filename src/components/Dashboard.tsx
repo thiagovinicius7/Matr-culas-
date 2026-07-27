@@ -77,6 +77,8 @@ export default function Dashboard({
     };
   });
 
+  const contraturnoOnlyCount = enrollments.filter(e => e.turmaRegularId === 'sem_regular').length;
+
   return (
     <div className="space-y-6" id="dashboard-container">
       {/* Header with quick stats & discrete data management */}
@@ -427,6 +429,32 @@ export default function Dashboard({
                 </div>
               );
             })}
+
+            {contraturnoOnlyCount > 0 && (
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 shadow-xs flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                    <span className="font-bold text-xs text-amber-950 font-display">
+                      Somente Contraturno
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-amber-800 font-mono mt-0.5">
+                    Sem Ensino Regular • Isento
+                  </div>
+                  <div className="text-[10px] mt-0.5 font-bold text-amber-900">
+                    R$ 0,00/mês (Regular)
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end font-display">
+                  <span className="text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border bg-white border-amber-300 text-amber-900">
+                    {contraturnoOnlyCount}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-amber-800 mt-1">alunos</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -215,8 +215,12 @@ export default function RematriculaList({
                       <div className="space-y-0.5">
                         <span className="font-bold text-slate-800 text-xs block">{student.nome}</span>
                         <div className="flex gap-1.5 items-center">
-                          <span className="text-[9px] bg-slate-100 text-slate-800 border border-slate-200 px-1.5 py-0.2 rounded font-mono font-bold">
-                            {regularClass?.nome}
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold border ${
+                            enrollment.turmaRegularId === 'sem_regular'
+                              ? 'bg-amber-100 text-amber-900 border-amber-200'
+                              : 'bg-slate-100 text-slate-800 border-slate-200'
+                          }`}>
+                            {enrollment.turmaRegularId === 'sem_regular' ? 'Somente Contraturno' : (regularClass?.nome || 'Nenhuma')}
                           </span>
                           {activeContraturno && (
                             <span className="text-[9px] bg-orange-50 text-orange-800 border border-orange-200 px-1.5 py-0.2 rounded font-semibold">
