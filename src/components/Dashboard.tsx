@@ -40,8 +40,21 @@ export default function Dashboard({
   const negotiatingPct = totalEnrollments > 0 ? Math.round((negotiating / totalEnrollments) * 100) : 0;
   const pendingPct = totalEnrollments > 0 ? Math.round((pending / totalEnrollments) * 100) : 0;
 
-  // Monthly Revenue Estimate
-  const regularRevenue = enrollments
+  // Monthly Revenue Estimate (Regular + Contraturnos)
+  const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
+  const contraturnoRevenue = activeContraturnos.reduce((sum, c) => sum + c.valorMensal, 0);
+
+  // 1) Regular revenue WITHOUT prompt payment discount (Sem Desconto de Pontualidade)
+  const regularRevenueGross = enrollments
+    .filter(e => e.statusNegociacao === 'Confirmada')
+    .reduce((sum, e) => {
+      const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+      const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
+      return sum + e.valorFinalRegular + lancheVal;
+    }, 0);
+
+  // 2) Regular revenue WITH prompt payment discount applied (Com Desconto de Pontualidade de 3%)
+  const regularRevenueWithDiscount = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
@@ -51,9 +64,9 @@ export default function Dashboard({
       return sum + (subtotal - discountVal);
     }, 0);
 
-  const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
-  const contraturnoRevenue = activeContraturnos.reduce((sum, c) => sum + c.valorMensal, 0);
-  const totalRevenue = regularRevenue + contraturnoRevenue;
+  // Totals combining Regular + Contraturnos
+  const totalRevenueWithoutDiscount = regularRevenueGross + contraturnoRevenue;
+  const totalRevenueWithDiscount = regularRevenueWithDiscount + contraturnoRevenue;
 
   // Distribution by Class
   const classDistribution = REGULAR_CLASSES.map(cls => {
@@ -262,17 +275,34 @@ export default function Dashboard({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex items-center gap-4"
+          className="bg-white p-4 rounded-lg border border-slate-150 shadow-xs flex flex-col justify-between"
         >
-          <div className="p-2.5 bg-orange-100 text-brand-clay rounded-lg">
-            <TrendingUp size={20} />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 text-brand-clay rounded-lg shrink-0">
+              <TrendingUp size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Receita Mensal Ativa</p>
+              <p className="text-[10px] text-slate-400 font-sans">Regular + Contraturnos</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Receita Mensal Ativa</p>
-            <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenue)}
-            </h3>
-            <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Regular + Contraturnos</p>
+
+          <div className="space-y-1.5 mt-2 pt-2 border-t border-slate-100 font-sans text-xs">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-slate-500 text-[10px] font-medium">Sem desc. pontualidade:</span>
+              <span className="font-bold text-slate-800 font-mono text-xs">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenueWithoutDiscount)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-1 bg-emerald-50/70 p-1.5 rounded border border-emerald-100">
+              <span className="text-emerald-800 text-[10px] font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                Com desc. pontualidade (3%):
+              </span>
+              <span className="font-extrabold text-brand-green-dark font-mono text-xs">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalRevenueWithDiscount)}
+              </span>
+            </div>
           </div>
         </motion.div>
       </div>
