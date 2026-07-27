@@ -51,6 +51,9 @@ export default function NegotiationCalc({
   const [addLanche, setAddLanche] = useState<boolean>(false);
   const [lancheValue, setLancheValue] = useState<number>(200);
 
+  const [addAlmoco, setAddAlmoco] = useState<boolean>(false);
+  const [almocoValue, setAlmocoValue] = useState<number>(250);
+
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
   const [descontoPontualidade, setDescontoPontualidade] = useState<boolean>(false);
@@ -104,7 +107,8 @@ export default function NegotiationCalc({
   const regularWithDiscount = includeRegular ? Math.max(0, regularBasePrice - discountVal) : 0;
 
   const weeklyFrequency = selectedDays.length;
-  const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices, selectedYear) : 0;
+  const isOnlyContraturno = !includeRegular;
+  const contraturnoPrice = enableContraturno ? getContraturnoPriceDynamic(weeklyFrequency, contraturnoPeriod, contraturnoPrices, selectedYear, isOnlyContraturno) : 0;
 
   // Calculate contraturno discount value in Reais
   const contraturnoDiscountVal = contraturnoDiscountType === 'porcentagem'
@@ -113,7 +117,7 @@ export default function NegotiationCalc({
 
   const contraturnoDiscounted = Math.max(0, contraturnoPrice - contraturnoDiscountVal);
 
-  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted + ((includeRegular && addLanche && regularClass?.natureza === 'Fundamental') ? lancheValue : 0);
+  const totalMonthlyCommitment = regularWithDiscount + contraturnoDiscounted + ((includeRegular && addLanche && regularClass?.natureza === 'Fundamental') ? lancheValue : 0) + (addAlmoco ? almocoValue : 0);
 
   // Auto-fill existing negotiation if student changes or selected year changes
   useEffect(() => {
@@ -129,6 +133,8 @@ export default function NegotiationCalc({
         setNotes(existing.anotacoes);
         setAddLanche(existing.adicionarLanche !== undefined ? existing.adicionarLanche : false);
         setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 200);
+        setAddAlmoco(existing.adicionarAlmoco !== undefined ? existing.adicionarAlmoco : false);
+        setAlmocoValue(existing.valorAlmoco !== undefined ? existing.valorAlmoco : 250);
         setDescontoPontualidade(existing.descontoPontualidade !== undefined ? existing.descontoPontualidade : false);
       } else {
         setIncludeRegular(true);
@@ -140,6 +146,8 @@ export default function NegotiationCalc({
         setNotes('');
         setAddLanche(false);
         setLancheValue(200);
+        setAddAlmoco(false);
+        setAlmocoValue(250);
         setDescontoPontualidade(false);
       }
 
@@ -187,6 +195,8 @@ export default function NegotiationCalc({
       valorDescontoContraturnoInput: contraturnoDiscountInput,
       adicionarLanche: includeRegular && addLanche && regularClass?.natureza === 'Fundamental',
       valorLanche: includeRegular && addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0,
+      adicionarAlmoco: addAlmoco,
+      valorAlmoco: addAlmoco ? almocoValue : 0,
       descontoPontualidade: descontoPontualidade
     };
 
@@ -363,6 +373,43 @@ export default function NegotiationCalc({
                     )}
                   </div>
                 )}
+
+                {/* Option to add lunch fee */}
+                <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="add-almoco"
+                      checked={addAlmoco}
+                      onChange={(e) => {
+                        setAddAlmoco(e.target.checked);
+                        if (e.target.checked && !almocoValue) {
+                          setAlmocoValue(250);
+                        }
+                      }}
+                      className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+                    />
+                    <label htmlFor="add-almoco" className="text-xs font-bold text-slate-800 select-none cursor-pointer flex items-center gap-1.5">
+                      <span>🍲</span> Acrescentar Valor do Almoço (Contraturno)
+                    </label>
+                  </div>
+                  {addAlmoco && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">Valor do Almoço:</span>
+                      <div className="relative w-28">
+                        <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-mono">R$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={almocoValue || ''}
+                          onChange={(e) => setAlmocoValue(Number(e.target.value))}
+                          className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-amber-300 focus:border-amber-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
+                          placeholder="250"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Option to add prompt payment discount */}
                 <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
@@ -668,6 +715,16 @@ export default function NegotiationCalc({
                       <span className="text-orange-700 font-medium">Adicional de Lanche (Fundamental):</span>
                       <span className="font-mono text-slate-800 font-bold">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lancheValue)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Almoço for Contraturno */}
+                  {addAlmoco && (
+                    <div className="flex justify-between text-xs text-slate-700 pt-1 border-t border-dashed border-slate-100">
+                      <span className="text-amber-800 font-medium">Adicional de Almoço (Contraturno):</span>
+                      <span className="font-mono text-amber-900 font-bold">
+                        +{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(almocoValue)}
                       </span>
                     </div>
                   )}

@@ -50,7 +50,8 @@ export default function Dashboard({
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
-      return sum + e.valorFinalRegular + lancheVal;
+      const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
+      return sum + e.valorFinalRegular + lancheVal + almocoVal;
     }, 0);
 
   // 2) Regular revenue WITH prompt payment discount applied (Com Desconto de Pontualidade de 3%)
@@ -59,7 +60,8 @@ export default function Dashboard({
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
-      const subtotal = e.valorFinalRegular + lancheVal;
+      const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
+      const subtotal = e.valorFinalRegular + lancheVal + almocoVal;
       const discountVal = e.descontoPontualidade ? Number((subtotal * 0.03).toFixed(2)) : 0;
       return sum + (subtotal - discountVal);
     }, 0);

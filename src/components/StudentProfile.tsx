@@ -1037,6 +1037,12 @@ export default function StudentProfile({
                                 <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorLanche || 0)}</span>
                               </div>
                             )}
+                            {e.adicionarAlmoco && (
+                              <div className="flex justify-between text-xs text-amber-700 font-medium">
+                                <span>Adicional Almoço (Contraturno):</span>
+                                <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorAlmoco || 0)}</span>
+                              </div>
+                            )}
                             {e.descontoPontualidade && (
                               <div className="flex justify-between text-xs text-blue-600 font-medium">
                                 <span>Desconto Pontualidade (3%):</span>

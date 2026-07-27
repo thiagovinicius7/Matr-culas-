@@ -147,12 +147,12 @@ export default function App() {
           await Promise.all(oldUnprefixed.map(ctp => deleteDocument('contraturnoPrices', ctp.id)));
 
           finalContraturnoPrices = [
-            { id: '2026_avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, ano: 2026 },
-            { id: '2026_freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, ano: 2026 },
-            { id: '2026_freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, ano: 2026 },
-            { id: '2026_freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, ano: 2026 },
-            { id: '2026_freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, ano: 2026 },
-            { id: '2026_freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, ano: 2026 }
+            { id: '2026_avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, valorSomenteContraturnoParcial: 120, valorSomenteContraturnoCompleto: 150, ano: 2026 },
+            { id: '2026_freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, valorSomenteContraturnoParcial: 300, valorSomenteContraturnoCompleto: 350, ano: 2026 },
+            { id: '2026_freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, valorSomenteContraturnoParcial: 480, valorSomenteContraturnoCompleto: 560, ano: 2026 },
+            { id: '2026_freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, valorSomenteContraturnoParcial: 680, valorSomenteContraturnoCompleto: 790, ano: 2026 },
+            { id: '2026_freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, valorSomenteContraturnoParcial: 870, valorSomenteContraturnoCompleto: 1010, ano: 2026 },
+            { id: '2026_freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, valorSomenteContraturnoParcial: 1050, valorSomenteContraturnoCompleto: 1230, ano: 2026 }
           ];
           await Promise.all(finalContraturnoPrices.map(ctp => saveDocument('contraturnoPrices', ctp)));
         }

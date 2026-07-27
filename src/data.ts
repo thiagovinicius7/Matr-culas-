@@ -92,14 +92,28 @@ export function getRegularClassForAgeDynamic(
   return sorted[8] || sorted[sorted.length - 1];
 }
 
+// Default prices for Somente Contraturno ("Dia no Sítio-Escola")
+const DEFAULT_SOMENTE_CONTRATURNO_TABLE: Record<number, { Parcial: number; Completo: number }> = {
+  0: { Parcial: 120, Completo: 150 },
+  1: { Parcial: 300, Completo: 350 },
+  2: { Parcial: 480, Completo: 560 },
+  3: { Parcial: 680, Completo: 790 },
+  4: { Parcial: 870, Completo: 1010 },
+  5: { Parcial: 1050, Completo: 1230 }
+};
+
 // Get Contraturno price dynamically from state-managed database prices
 export function getContraturnoPriceDynamic(
   frequencia: number, 
   periodo: 'Parcial' | 'Completo', 
   contraturnoPricesList: ContraturnoPrice[],
-  year: number = 2026
+  year: number = 2026,
+  isOnlyContraturno: boolean = false
 ): number {
   if (!contraturnoPricesList || contraturnoPricesList.length === 0) {
+    if (isOnlyContraturno) {
+      return DEFAULT_SOMENTE_CONTRATURNO_TABLE[frequencia]?.[periodo] || getContraturnoPrice(frequencia, periodo);
+    }
     return getContraturnoPrice(frequencia, periodo);
   }
   
@@ -109,7 +123,22 @@ export function getContraturnoPriceDynamic(
 
   const match = listToUse.find(cp => cp.frequencia === frequencia);
   if (match) {
+    if (isOnlyContraturno) {
+      if (periodo === 'Parcial') {
+        return (match.valorSomenteContraturnoParcial !== undefined && match.valorSomenteContraturnoParcial > 0)
+          ? match.valorSomenteContraturnoParcial
+          : (DEFAULT_SOMENTE_CONTRATURNO_TABLE[frequencia]?.Parcial || match.valorParcial);
+      } else {
+        return (match.valorSomenteContraturnoCompleto !== undefined && match.valorSomenteContraturnoCompleto > 0)
+          ? match.valorSomenteContraturnoCompleto
+          : (DEFAULT_SOMENTE_CONTRATURNO_TABLE[frequencia]?.Completo || match.valorCompleto);
+      }
+    }
     return periodo === 'Parcial' ? match.valorParcial : match.valorCompleto;
+  }
+  
+  if (isOnlyContraturno) {
+    return DEFAULT_SOMENTE_CONTRATURNO_TABLE[frequencia]?.[periodo] || getContraturnoPrice(frequencia, periodo);
   }
   return getContraturnoPrice(frequencia, periodo);
 }

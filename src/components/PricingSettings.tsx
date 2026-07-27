@@ -27,6 +27,7 @@ export default function PricingSettings({
 
   const [localClasses, setLocalClasses] = useState<RegularClass[]>([]);
   const [localContraturno, setLocalContraturno] = useState<ContraturnoPrice[]>([]);
+  const [contraturnoTableTab, setContraturnoTableTab] = useState<'regular' | 'somente_contraturno'>('regular');
   const [isSaved, setIsSaved] = useState(false);
 
   // Password fields state
@@ -89,12 +90,12 @@ export default function PricingSettings({
         setLocalContraturno(copied);
       } else {
         const defaultContraturno: ContraturnoPrice[] = [
-          { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, ano: selectedYear },
-          { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, ano: selectedYear },
-          { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, ano: selectedYear },
-          { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, ano: selectedYear },
-          { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, ano: selectedYear },
-          { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, ano: selectedYear }
+          { id: 'avulso', frequencia: 0, valorParcial: 100, valorCompleto: 120, valorSomenteContraturnoParcial: 120, valorSomenteContraturnoCompleto: 150, ano: selectedYear },
+          { id: 'freq_1', frequencia: 1, valorParcial: 220, valorCompleto: 260, valorSomenteContraturnoParcial: 300, valorSomenteContraturnoCompleto: 350, ano: selectedYear },
+          { id: 'freq_2', frequencia: 2, valorParcial: 460, valorCompleto: 520, valorSomenteContraturnoParcial: 480, valorSomenteContraturnoCompleto: 560, ano: selectedYear },
+          { id: 'freq_3', frequencia: 3, valorParcial: 630, valorCompleto: 690, valorSomenteContraturnoParcial: 680, valorSomenteContraturnoCompleto: 790, ano: selectedYear },
+          { id: 'freq_4', frequencia: 4, valorParcial: 775, valorCompleto: 862.5, valorSomenteContraturnoParcial: 870, valorSomenteContraturnoCompleto: 1010, ano: selectedYear },
+          { id: 'freq_5', frequencia: 5, valorParcial: 920, valorCompleto: 1035, valorSomenteContraturnoParcial: 1050, valorSomenteContraturnoCompleto: 1230, ano: selectedYear }
         ];
         setLocalContraturno(defaultContraturno);
       }
@@ -406,84 +407,137 @@ export default function PricingSettings({
 
         {/* Contraturno Frequencies Column */}
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-xs space-y-4">
-          <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
-            <div>
+          <div className="border-b border-slate-100 pb-2 space-y-2">
+            <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <span>🌳</span> Valores do Contraturno (Frequência)
+                <span>🌳</span> Tabela de Preços do Contraturno ({selectedYear})
               </h3>
-              <p className="text-[10px] text-slate-405 mt-0.5">Defina diária/frequência e os valores parciais/completos.</p>
+              <button
+                onClick={handleAddContraturno}
+                className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-800 text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Plus size={12} />
+                Adicionar Frequência
+              </button>
             </div>
-            <button
-              onClick={handleAddContraturno}
-              className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-800 text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Plus size={12} />
-              Adicionar Frequência
-            </button>
+
+            {/* Sub-tabs for Regular vs Somente Contraturno */}
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1">
+              <button
+                type="button"
+                onClick={() => setContraturnoTableTab('regular')}
+                className={`flex-1 py-1 px-2 text-[11px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  contraturnoTableTab === 'regular'
+                    ? 'bg-white text-slate-800 shadow-xs border border-slate-200 font-extrabold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>🐝</span> Alunos Ensino Regular
+              </button>
+              <button
+                type="button"
+                onClick={() => setContraturnoTableTab('somente_contraturno')}
+                className={`flex-1 py-1 px-2 text-[11px] font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  contraturnoTableTab === 'somente_contraturno'
+                    ? 'bg-orange-600 text-white shadow-xs font-extrabold'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>☀️</span> Somente Contraturno ("Dia no Sítio")
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-500">
+              {contraturnoTableTab === 'regular'
+                ? 'Tabela de contraturno adicional para alunos regularmente matriculados na escola.'
+                : 'Tabela exclusiva para alunos matriculados SOMENTE no Contraturno (Isentos do Ensino Regular).'}
+            </p>
           </div>
 
           <div className="space-y-4">
             <div className="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1">
               <div className="col-span-4">Freq./Diária</div>
               <div className="col-span-4 text-center">Período Parcial</div>
-              <div className="col-span-3 text-center">Completo</div>
+              <div className="col-span-3 text-center">Completo (Vespertino)</div>
               <div className="col-span-1"></div>
             </div>
 
             <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto pr-1 space-y-1">
-              {localContraturno.map((cp) => (
-                <div key={cp.id} className="py-2.5 grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-4 flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min="0"
-                      max="7"
-                      value={cp.frequencia}
-                      onChange={(e) => handleContraturnoPriceChange(cp.id, 'frequencia', Number(e.target.value))}
-                      className="w-12 text-xs font-bold px-1 py-1 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none text-center"
-                    />
-                    <span className="text-[11px] text-slate-600 font-medium">
-                      {cp.frequencia === 0 ? 'Avulso (diária)' : 'x / sem'}
-                    </span>
-                  </div>
+              {localContraturno.map((cp) => {
+                const currentParcial = contraturnoTableTab === 'regular'
+                  ? cp.valorParcial
+                  : (cp.valorSomenteContraturnoParcial !== undefined ? cp.valorSomenteContraturnoParcial : (cp.frequencia === 1 ? 300 : cp.frequencia === 2 ? 480 : cp.frequencia === 3 ? 680 : cp.frequencia === 4 ? 870 : cp.frequencia === 5 ? 1050 : 120));
 
-                  {/* Parcial input */}
-                  <div className="col-span-4 flex items-center gap-1 justify-center">
-                    <span className="text-[10px] text-slate-400 font-bold">R$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="20"
-                      value={cp.valorParcial}
-                      onChange={(e) => handleContraturnoPriceChange(cp.id, 'valorParcial', Number(e.target.value))}
-                      className="w-20 text-xs font-mono font-bold px-1.5 py-1 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none text-right"
-                    />
-                  </div>
+                const currentCompleto = contraturnoTableTab === 'regular'
+                  ? cp.valorCompleto
+                  : (cp.valorSomenteContraturnoCompleto !== undefined ? cp.valorSomenteContraturnoCompleto : (cp.frequencia === 1 ? 350 : cp.frequencia === 2 ? 560 : cp.frequencia === 3 ? 790 : cp.frequencia === 4 ? 1010 : cp.frequencia === 5 ? 1230 : 150));
 
-                  {/* Completo input */}
-                  <div className="col-span-3 flex items-center gap-1 justify-center">
-                    <span className="text-[10px] text-slate-400 font-bold">R$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="20"
-                      value={cp.valorCompleto}
-                      onChange={(e) => handleContraturnoPriceChange(cp.id, 'valorCompleto', Number(e.target.value))}
-                      className="w-20 text-xs font-mono font-bold px-1.5 py-1 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none text-right"
-                    />
-                  </div>
+                return (
+                  <div key={cp.id} className="py-2.5 grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-4 flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        max="7"
+                        value={cp.frequencia}
+                        onChange={(e) => handleContraturnoPriceChange(cp.id, 'frequencia', Number(e.target.value))}
+                        className="w-12 text-xs font-bold px-1 py-1 border border-slate-200 rounded-md focus:border-slate-500 focus:outline-none text-center"
+                      />
+                      <span className="text-[11px] text-slate-600 font-medium">
+                        {cp.frequencia === 0 ? 'Avulso (diária)' : 'x / sem'}
+                      </span>
+                    </div>
 
-                  <div className="col-span-1 flex justify-end">
-                    <button
-                      onClick={() => handleDeleteContraturno(cp.id)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition-colors cursor-pointer"
-                      title="Excluir frequência"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {/* Parcial input */}
+                    <div className="col-span-4 flex items-center gap-1 justify-center">
+                      <span className="text-[10px] text-slate-400 font-bold">R$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="10"
+                        value={currentParcial}
+                        onChange={(e) => handleContraturnoPriceChange(
+                          cp.id,
+                          contraturnoTableTab === 'regular' ? 'valorParcial' : 'valorSomenteContraturnoParcial',
+                          Number(e.target.value)
+                        )}
+                        className={`w-20 text-xs font-mono font-bold px-1.5 py-1 border rounded-md focus:outline-none text-right ${
+                          contraturnoTableTab === 'somente_contraturno' ? 'border-orange-300 focus:border-orange-500 bg-orange-50/30' : 'border-slate-200 focus:border-slate-500'
+                        }`}
+                      />
+                    </div>
+
+                    {/* Completo input */}
+                    <div className="col-span-3 flex items-center gap-1 justify-center">
+                      <span className="text-[10px] text-slate-400 font-bold">R$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="10"
+                        value={currentCompleto}
+                        onChange={(e) => handleContraturnoPriceChange(
+                          cp.id,
+                          contraturnoTableTab === 'regular' ? 'valorCompleto' : 'valorSomenteContraturnoCompleto',
+                          Number(e.target.value)
+                        )}
+                        className={`w-20 text-xs font-mono font-bold px-1.5 py-1 border rounded-md focus:outline-none text-right ${
+                          contraturnoTableTab === 'somente_contraturno' ? 'border-orange-300 focus:border-orange-500 bg-orange-50/30' : 'border-slate-200 focus:border-slate-500'
+                        }`}
+                      />
+                    </div>
+
+                    <div className="col-span-1 flex justify-end">
+                      <button
+                        onClick={() => handleDeleteContraturno(cp.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-md transition-colors cursor-pointer"
+                        title="Excluir frequência"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {localContraturno.length === 0 && (
                 <p className="text-center text-xs text-slate-400 py-8 italic">Nenhuma frequência configurada. Clique em "Adicionar Frequência" ou "Padrões".</p>
               )}

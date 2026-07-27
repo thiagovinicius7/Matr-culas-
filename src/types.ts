@@ -56,6 +56,8 @@ export interface Enrollment {
   valorDescontoContraturnoInput?: number;
   adicionarLanche?: boolean;
   valorLanche?: number;
+  adicionarAlmoco?: boolean;
+  valorAlmoco?: number;
   descontoPontualidade?: boolean;
 }
 
@@ -74,5 +76,7 @@ export interface ContraturnoPrice {
   frequencia: number; // 0 is avulso, 1-5 is weekly frequency
   valorParcial: number;
   valorCompleto: number;
+  valorSomenteContraturnoParcial?: number;
+  valorSomenteContraturnoCompleto?: number;
   ano?: number;
 }
