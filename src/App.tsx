@@ -87,12 +87,27 @@ export default function App() {
           getCollectionData<{ id: string; value: string }>('settings')
         ]);
         
-        // Ensure all imported students (including Ana Thereza, Carolina Ramalho Bessa, Pedro Ramalho Bessa) exist in database
-        const existingStudentIds = new Set(loadedStudents.map(s => s.id));
+        // Clean up temporary dummy student IDs if they exist in Firestore
+        const dummyIds = ['student_12431', 'student_12432', 'student_12433'];
+        for (const dId of dummyIds) {
+          if (loadedStudents.some(s => s.id === dId)) {
+            await deleteDocument('students', dId);
+          }
+          if (loadedEnrollments.some(e => e.alunoId === dId)) {
+            await deleteDocument('enrollments', `enroll_${dId}`);
+            await deleteDocument('enrollments', `enroll_imp_${dId}`);
+            await deleteDocument('enrollments', `enroll_auto_${dId}`);
+          }
+        }
+
+        const filteredLoadedStudents = loadedStudents.filter(s => !dummyIds.includes(s.id));
+        const filteredLoadedEnrollments = loadedEnrollments.filter(e => !dummyIds.includes(e.alunoId));
+
+        const existingStudentIds = new Set(filteredLoadedStudents.map(s => s.id));
         const importedEnrollments = getImportedEnrollments();
 
-        const allStudents = [...loadedStudents];
-        const allEnrollments = [...loadedEnrollments];
+        const allStudents = [...filteredLoadedStudents];
+        const allEnrollments = [...filteredLoadedEnrollments];
 
         for (const impStudent of IMPORTED_STUDENTS) {
           if (!existingStudentIds.has(impStudent.id)) {
@@ -109,35 +124,28 @@ export default function App() {
 
         const sortedStudents = allStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-        // Adjust class assignment for Pedro Towê (Abelha Branca), Rita Timo (Uruçu), etc.
-        const adjustedEnrollments = allEnrollments.map(e => {
-          let changed = false;
-          let fixed = { ...e };
-          
-          if (fixed.alunoId === 'student_12376' && fixed.turmaRegularId !== 'abelha_branca') {
-            fixed.turmaRegularId = 'abelha_branca';
-            fixed.valorRegularOriginal = 2400;
-            fixed.valorFinalRegular = Math.max(0, 2400 - (fixed.descontoMensal || 0));
-            changed = true;
-          }
-          if (fixed.alunoId === 'student_12430' && fixed.turmaRegularId !== 'urucu') {
-            fixed.turmaRegularId = 'urucu';
-            fixed.valorRegularOriginal = 2200;
-            fixed.valorFinalRegular = Math.max(0, 2200 - (fixed.descontoMensal || 0));
-            changed = true;
-          }
-          if (changed) {
-            saveDocument('enrollments', fixed);
-          }
-          return fixed;
-        });
+        // Class price lookup
+        const classPricesMap: Record<string, number> = {
+          'mirim_1': 1600,
+          'mirim_2': 1700,
+          'mandacaia_1': 1800,
+          'mandacaia_2': 1900,
+          'jatai': 2100,
+          'urucu': 2200,
+          'irai': 2300,
+          'abelha_branca': 2400,
+          'benjoi': 2500
+        };
 
-        // Ensure every student has an enrollment record
-        const studentEnrollmentSet = new Set(adjustedEnrollments.map(e => e.alunoId));
+        // Create or adjust enrollments for every student
+        const adjustedEnrollments: Enrollment[] = [];
         for (const st of sortedStudents) {
-          if (!studentEnrollmentSet.has(st.id)) {
-            const matchedImp = importedEnrollments.find(e => e.alunoId === st.id);
-            const newE: Enrollment = matchedImp || {
+          let existingE = allEnrollments.find(e => e.alunoId === st.id);
+          let changed = false;
+
+          if (!existingE) {
+            const impE = importedEnrollments.find(e => e.alunoId === st.id);
+            existingE = impE || {
               id: `enroll_auto_${st.id}`,
               alunoId: st.id,
               ano: 2026,
@@ -145,12 +153,51 @@ export default function App() {
               valorRegularOriginal: 2100,
               descontoMensal: 0,
               valorFinalRegular: 2100,
-              statusNegociacao: 'Pendente',
-              anotacoes: 'Matrícula gerada automaticamente'
+              statusNegociacao: 'Confirmada',
+              anotacoes: 'Matrícula Sítio Geranium'
             };
-            adjustedEnrollments.push(newE);
-            saveDocument('enrollments', newE);
+            changed = true;
           }
+
+          let fixedE: Enrollment = { ...existingE };
+
+          // Determine correct class based on specific names and age cutoff
+          const lowerName = st.nome.toLowerCase();
+          let targetClassId = fixedE.turmaRegularId;
+
+          if (st.id === 'student_12376' || lowerName.includes('pedro towê') || lowerName.includes('pedro towe')) {
+            targetClassId = 'abelha_branca'; // Pedro Towê -> Abelha Branca (4º Ano)
+          } else if (lowerName.includes('pedro') && (lowerName.includes('ramalho') || lowerName.includes('bessa'))) {
+            targetClassId = 'irai'; // Pedro Ramalho Bessa -> Iraí (3º Ano)
+          } else if (lowerName.includes('carolina') && (lowerName.includes('ramalho') || lowerName.includes('bessa'))) {
+            targetClassId = 'jatai'; // Carolina Ramalho Bessa -> Jataí (1º Ano)
+          } else if (lowerName.includes('ana thereza') || lowerName.includes('tristão') || lowerName.includes('tristao')) {
+            targetClassId = 'mirim_1'; // Ana Thereza -> Mirim 1
+          } else if (st.id === 'student_12430' || lowerName.includes('rita timo')) {
+            targetClassId = 'urucu'; // Rita Timo -> Uruçu (2º Ano)
+          } else if (!targetClassId || targetClassId === 'sem_regular') {
+            const age = calculateAgeAtCutoff(st.nascimento, 2026);
+            targetClassId = getRegularClassForAge(age).id;
+          }
+
+          if (fixedE.turmaRegularId !== targetClassId) {
+            fixedE.turmaRegularId = targetClassId;
+            const price = classPricesMap[targetClassId] || 2100;
+            fixedE.valorRegularOriginal = price;
+            fixedE.valorFinalRegular = Math.max(0, price - (fixedE.descontoMensal || 0));
+            changed = true;
+          }
+
+          if (fixedE.statusNegociacao !== 'Confirmada') {
+            fixedE.statusNegociacao = 'Confirmada';
+            changed = true;
+          }
+
+          if (changed) {
+            await saveDocument('enrollments', fixedE);
+          }
+
+          adjustedEnrollments.push(fixedE);
         }
 
         setStudents(sortedStudents);

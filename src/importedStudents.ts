@@ -537,30 +537,6 @@ export const IMPORTED_STUDENTS: Student[] = [
     dataEntrada: '2025-12-03',
     observacoes: 'Importado de Relatório de Turmas. Turno regular Jataí (1º Ano).',
     status: 'ativo'
-  },
-  {
-    id: 'student_12431',
-    nome: 'Ana Thereza Santos Tristão',
-    nascimento: '2024-08-15',
-    dataEntrada: '2026-02-01',
-    observacoes: 'Idade: 1 ano • Turma Regular: Mirim 1',
-    status: 'ativo'
-  },
-  {
-    id: 'student_12432',
-    nome: 'Carolina Ramalho Bessa',
-    nascimento: '2019-09-10',
-    dataEntrada: '2026-02-01',
-    observacoes: 'Idade: 6 anos • Turma Regular: Jataí (1º Ano)',
-    status: 'ativo'
-  },
-  {
-    id: 'student_12433',
-    nome: 'Pedro Ramalho Bessa',
-    nascimento: '2017-06-20',
-    dataEntrada: '2026-02-01',
-    observacoes: 'Idade: 8 anos • Turma Regular: Iraí (3º Ano)',
-    status: 'ativo'
   }
 ];
 
@@ -1562,10 +1538,7 @@ export function getImportedEnrollments(): Enrollment[] {
     'Athos Barbosa Xavier': { id: 'jatai', price: 2100 },
     'Helena Macedo Valim': { id: 'jatai', price: 2100 },
     'Maitê Gomes de Almeida Barros': { id: 'jatai', price: 2100 },
-    'Oliver de Souza Rocha': { id: 'jatai', price: 2100 },
-    'Ana Thereza Santos Tristão': { id: 'mirim_1', price: 1600 },
-    'Carolina Ramalho Bessa': { id: 'jatai', price: 2100 },
-    'Pedro Ramalho Bessa': { id: 'irai', price: 2300 }
+    'Oliver de Souza Rocha': { id: 'jatai', price: 2100 }
   };
 
   const enrollments: Enrollment[] = [];
@@ -1588,7 +1561,7 @@ export function getImportedEnrollments(): Enrollment[] {
       valorRegularOriginal: classInfo.price,
       descontoMensal: discount,
       valorFinalRegular: classInfo.price - discount,
-      statusNegociacao: 'Pendente',
+      statusNegociacao: 'Confirmada',
       anotacoes: 'Importado de forma segura e fidedigna através do Relatório de Turmas do Sítio-Escola Geranium.'
     });
   });
