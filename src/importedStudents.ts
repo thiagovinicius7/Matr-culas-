@@ -1485,7 +1485,7 @@ export function getImportedEnrollments(): Enrollment[] {
     'Leonardo Sousa Nobrega': { id: 'urucu', price: 2200 },
     'Miguel Luiz Oliveira': { id: 'irai', price: 2300 },
     'Moana Bernardes Viana': { id: 'mandacaia_2', price: 1900 },
-    'Pedro Towê de Vasconcelos Crispim': { id: 'irai', price: 2300 },
+    'Pedro Towê de Vasconcelos Crispim': { id: 'abelha_branca', price: 2400 },
     'Radek Cordeiro Valença Rocha': { id: 'jatai', price: 2100 },
     'Rita Timo Batista de Castro Oliveira': { id: 'urucu', price: 2200 },
     'Ruda Alexandre Nunes Portugal': { id: 'mandacaia_2', price: 1900 },

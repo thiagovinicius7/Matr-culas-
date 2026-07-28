@@ -30,7 +30,7 @@ import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
-import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
@@ -89,15 +89,15 @@ export default function App() {
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-        // Adjust class assignment for Pedro Towê (Iraí) and Rita Timo (Uruçu) if needed, keeping negotiation status & discounts intact
+        // Adjust class assignment for Pedro Towê (Abelha Branca) and Rita Timo (Uruçu) according to birthdate & cutoff rules
         const adjustedEnrollments = loadedEnrollments.map(e => {
           let changed = false;
           let fixed = { ...e };
           
-          if (fixed.alunoId === 'student_12376' && fixed.turmaRegularId !== 'irai') {
-            fixed.turmaRegularId = 'irai';
-            fixed.valorRegularOriginal = 2300;
-            fixed.valorFinalRegular = Math.max(0, 2300 - (fixed.descontoMensal || 0));
+          if (fixed.alunoId === 'student_12376' && fixed.turmaRegularId !== 'abelha_branca') {
+            fixed.turmaRegularId = 'abelha_branca';
+            fixed.valorRegularOriginal = 2400;
+            fixed.valorFinalRegular = Math.max(0, 2400 - (fixed.descontoMensal || 0));
             changed = true;
           }
           if (fixed.alunoId === 'student_12430' && fixed.turmaRegularId !== 'urucu') {
@@ -933,6 +933,89 @@ export default function App() {
     );
   }
 
+  const handleExportBackup = () => {
+    const backupData = {
+      app: 'Gestor Sítio-Escola Geranium',
+      version: '2026.1',
+      exportedAt: new Date().toISOString(),
+      totalStudents: students.length,
+      students,
+      guardians,
+      enrollments,
+      contraturnos,
+      movements,
+      classPrices,
+    };
+
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(backupData, null, 2)
+    )}`;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    downloadAnchor.setAttribute('download', `backup_geranium_${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.students || !Array.isArray(data.students) || !data.enrollments || !Array.isArray(data.enrollments)) {
+        alert('Arquivo de backup inválido ou em formato incompatível.');
+        return;
+      }
+
+      const dateInfo = data.exportedAt ? new Date(data.exportedAt).toLocaleString('pt-BR') : 'sem data';
+      const countInfo = `${data.students.length} alunos e ${data.enrollments.length} matrículas`;
+
+      if (!confirm(`Restaurar backup do dia ${dateInfo} (${countInfo})?\n\nIsso atualizará os dados locais e no Firebase.`)) {
+        return;
+      }
+
+      setLoading(true);
+
+      if (Array.isArray(data.students)) {
+        await Promise.all(data.students.map((s: any) => saveDocument('students', s)));
+        setStudents(data.students);
+      }
+      if (Array.isArray(data.guardians)) {
+        await Promise.all(data.guardians.map((g: any) => saveDocument('guardians', g)));
+        setGuardians(data.guardians);
+      }
+      if (Array.isArray(data.enrollments)) {
+        await Promise.all(data.enrollments.map((e: any) => saveDocument('enrollments', e)));
+        setEnrollments(data.enrollments);
+      }
+      if (Array.isArray(data.contraturnos)) {
+        await Promise.all(data.contraturnos.map((c: any) => saveDocument('contraturnos', c)));
+        setContraturnos(data.contraturnos);
+      }
+      if (Array.isArray(data.movements)) {
+        await Promise.all(data.movements.map((m: any) => saveDocument('movements', m)));
+        setMovements(data.movements);
+      }
+      if (Array.isArray(data.classPrices)) {
+        await Promise.all(data.classPrices.map((cp: any) => saveDocument('classPrices', cp)));
+        setClassPrices(data.classPrices);
+      }
+
+      setLoading(false);
+      alert('Backup restaurado com sucesso!');
+    } catch (err) {
+      console.error('Erro ao restaurar backup:', err);
+      setLoading(false);
+      alert('Erro ao processar o arquivo de backup. Verifique se é um arquivo JSON válido.');
+    }
+    event.target.value = '';
+  };
+
   if (!isLoggedIn) {
     return (
       <LoginScreen 
@@ -986,6 +1069,17 @@ export default function App() {
               </button>
             );
           })}
+
+          <div className="pt-2 border-t border-emerald-900/30 mt-2">
+            <button
+              onClick={handleExportBackup}
+              className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md text-emerald-200 hover:text-white hover:bg-emerald-900/40 transition-all border border-emerald-800/50 cursor-pointer"
+              title="Baixar cópia de segurança em arquivo JSON"
+            >
+              <Download size={14} className="text-brand-orange shrink-0" />
+              <span>Baixar Backup JSON</span>
+            </button>
+          </div>
         </nav>
 
         {/* Sidebar Footer */}
@@ -1066,10 +1160,20 @@ export default function App() {
               })}
               <button
                 onClick={() => {
+                  handleExportBackup();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-all text-emerald-200 hover:bg-emerald-900/40 border-t border-emerald-900/20 mt-1"
+              >
+                <Download size={14} className="text-brand-orange" />
+                Baixar Backup JSON
+              </button>
+              <button
+                onClick={() => {
                   handleLogout();
                   setIsMobileMenuOpen(false);
                 }}
-                className="flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-all text-rose-300 hover:bg-rose-950/40 border-t border-emerald-900/20 mt-1"
+                className="flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-all text-rose-300 hover:bg-rose-950/40"
               >
                 <LogOut size={14} className="text-rose-400" />
                 Sair do Sistema (Bloquear)
@@ -1096,10 +1200,30 @@ export default function App() {
               <p className="text-lg font-extrabold text-brand-orange leading-tight">{pendingEnrollmentsCount}</p>
             </div>
           </div>
-          <div className="flex items-center shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button 
+              onClick={handleExportBackup}
+              className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 font-display"
+              title="Baixar cópia de segurança completa do banco de dados em formato JSON"
+            >
+              <Download size={14} />
+              Baixar Backup
+            </button>
+
+            <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 font-display border border-slate-300">
+              <Upload size={14} className="text-slate-500" />
+              Restaurar
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={handleImportBackup} 
+                className="hidden" 
+              />
+            </label>
+
             <button 
               onClick={() => setActiveTab('students')}
-              className="px-4 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer uppercase tracking-wider font-display"
+              className="px-4 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded shadow-xs transition-colors cursor-pointer uppercase tracking-wider font-display ml-1"
             >
               NOVO ALUNO
             </button>
