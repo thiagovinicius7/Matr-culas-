@@ -87,10 +87,30 @@ export default function App() {
           getCollectionData<{ id: string; value: string }>('settings')
         ]);
         
-        const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        // Ensure all imported students (including Ana Thereza, Carolina Ramalho Bessa, Pedro Ramalho Bessa) exist in database
+        const existingStudentIds = new Set(loadedStudents.map(s => s.id));
+        const importedEnrollments = getImportedEnrollments();
 
-        // Adjust class assignment for Pedro Towê (Abelha Branca) and Rita Timo (Uruçu) according to birthdate & cutoff rules
-        const adjustedEnrollments = loadedEnrollments.map(e => {
+        const allStudents = [...loadedStudents];
+        const allEnrollments = [...loadedEnrollments];
+
+        for (const impStudent of IMPORTED_STUDENTS) {
+          if (!existingStudentIds.has(impStudent.id)) {
+            allStudents.push(impStudent);
+            await saveDocument('students', impStudent);
+
+            const defaultEnrollment = importedEnrollments.find(e => e.alunoId === impStudent.id);
+            if (defaultEnrollment) {
+              allEnrollments.push(defaultEnrollment);
+              await saveDocument('enrollments', defaultEnrollment);
+            }
+          }
+        }
+
+        const sortedStudents = allStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+        // Adjust class assignment for Pedro Towê (Abelha Branca), Rita Timo (Uruçu), etc.
+        const adjustedEnrollments = allEnrollments.map(e => {
           let changed = false;
           let fixed = { ...e };
           
@@ -111,6 +131,27 @@ export default function App() {
           }
           return fixed;
         });
+
+        // Ensure every student has an enrollment record
+        const studentEnrollmentSet = new Set(adjustedEnrollments.map(e => e.alunoId));
+        for (const st of sortedStudents) {
+          if (!studentEnrollmentSet.has(st.id)) {
+            const matchedImp = importedEnrollments.find(e => e.alunoId === st.id);
+            const newE: Enrollment = matchedImp || {
+              id: `enroll_auto_${st.id}`,
+              alunoId: st.id,
+              ano: 2026,
+              turmaRegularId: 'jatai',
+              valorRegularOriginal: 2100,
+              descontoMensal: 0,
+              valorFinalRegular: 2100,
+              statusNegociacao: 'Pendente',
+              anotacoes: 'Matrícula gerada automaticamente'
+            };
+            adjustedEnrollments.push(newE);
+            saveDocument('enrollments', newE);
+          }
+        }
 
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
