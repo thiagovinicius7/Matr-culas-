@@ -30,6 +30,7 @@ import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
+import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -37,6 +38,24 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Toast Notifications State
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const showToast = (title: string, description?: string, type: ToastMessage['type'] = 'info', duration?: number) => {
+    const newToast: ToastMessage = {
+      id: `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      title,
+      description,
+      type,
+      duration
+    };
+    setToasts(prev => [...prev, newToast]);
+  };
+
+  const handleDismissToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
 
   // App Password and Session states
   const [appPassword, setAppPassword] = useState<string>('456321');
@@ -382,10 +401,11 @@ export default function App() {
         ...contraturnosToSave.map(c => saveDocument('contraturnos', c))
       ]);
 
-      window.alert(
-        'Sincronização concluída com sucesso!\n' +
-        'Alunos processados: ' + studentsToSave.length + '\n' +
-        'As informações foram atualizadas e os acordos financeiros em andamento foram preservados.'
+      showToast(
+        'Sincronização Concluída com Sucesso!',
+        `${studentsToSave.length} alunos processados. As informações foram salvas no Firebase e os acordos financeiros em andamento foram preservados.`,
+        'success',
+        6000
       );
 
       const sortedStudents = [...updatedStudents].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -403,7 +423,7 @@ export default function App() {
 
     } catch (error) {
       console.error('Error merging Geranium data:', error);
-      window.alert('A importação falhou. Detalhes no console (F12).');
+      showToast('Falha na Importação', 'Ocorreu um erro ao importar os dados. Tente novamente.', 'error', 6000);
     } finally {
       setLoading(false);
     }
@@ -464,12 +484,14 @@ export default function App() {
     };
     setMovements(prev => [...prev, initialMovement]);
     saveDocument('movements', initialMovement);
+    showToast('Novo Aluno Cadastrado', `O aluno ${newStudent.nome} foi salvo no Firebase.`, 'success');
   };
 
   // Handler: Edit basic student details
   const handleUpdateStudent = (updatedStudent: Student) => {
     setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
     saveDocument('students', updatedStudent);
+    showToast('Cadastro Atualizado', `As alterações de ${updatedStudent.nome} foram salvas.`, 'success');
 
     // If birthday changed, recalculate regular class and adjust enrollment base price
     const oldStudent = students.find(s => s.id === updatedStudent.id);
@@ -523,6 +545,7 @@ export default function App() {
 
     movements.filter(m => m.alunoId === studentId).forEach(m => deleteDocument('movements', m.id));
     setMovements(prev => prev.filter(m => m.alunoId !== studentId));
+    showToast('Aluno Excluído', 'O aluno e seus registros associados foram removidos.', 'warning');
   };
 
   // Handler: Add a guardian to an existing student
@@ -547,12 +570,14 @@ export default function App() {
     } else {
       setGuardians(prev => [...prev, guardianWithId]);
     }
+    showToast('Responsável Adicionado', 'O novo responsável financeiro foi salvo no Firebase.', 'success');
   };
 
   // Handler: Delete a single guardian
   const handleDeleteGuardian = (guardianId: string) => {
     setGuardians(prev => prev.filter(g => g.id !== guardianId));
     deleteDocument('guardians', guardianId);
+    showToast('Responsável Removido', 'O registro do responsável foi excluído.', 'info');
   };
 
   // Handler: Complete agreement (calculator save)
@@ -660,6 +685,15 @@ export default function App() {
 
     setMovements(prev => [...prev, movement]);
     saveDocument('movements', movement);
+
+    const targetStudent = students.find(s => s.id === alunoId);
+    const studentName = targetStudent ? targetStudent.nome : 'o aluno';
+    showToast(
+      'Acordo Salvo com Sucesso!',
+      `O acordo comercial e a rematrícula de ${studentName} para ${enrollmentData.ano} foram salvos no Firebase.`,
+      'success',
+      5000
+    );
   };
 
   // Handler: Fast change status in Worklist
@@ -694,6 +728,8 @@ export default function App() {
       setMovements(prev => [...prev, movement]);
       saveDocument('movements', movement);
     }
+    const stName = students.find(s => s.id === alunoId)?.nome || 'o aluno';
+    showToast('Status Atualizado', `A situação de ${stName} foi alterada para "${status}".`, 'success');
   };
 
   // Handler: Fast update notes in Worklist
@@ -706,6 +742,7 @@ export default function App() {
       }
       return e;
     }));
+    showToast('Anotações Salvas', 'Observação registrada com sucesso.', 'info');
   };
 
   // Handler: Update Discounts from Worklist directly
@@ -768,6 +805,8 @@ export default function App() {
       setMovements(prev => [...prev, movement]);
       saveDocument('movements', movement);
     }
+    const stName = student ? student.nome : 'o aluno';
+    showToast('Descontos Salvos', `Novos valores negociados para ${stName} foram salvos com sucesso.`, 'success');
   };
 
   // Handler: Change regular class manually (exceptional case)
@@ -815,6 +854,7 @@ export default function App() {
       setMovements(prev => [...prev, movement]);
       saveDocument('movements', movement);
     }
+    showToast('Turma Alterada', `A nova turma ${match?.nome || ''} foi atribuída e salva no Firebase.`, 'success');
   };
 
   // Handler: Update an existing guardian in place
@@ -838,6 +878,7 @@ export default function App() {
         return g;
       }));
     }
+    showToast('Responsável Salvo', 'Dados do responsável financeiro atualizados no Firebase.', 'success');
   };
 
   // Handler: Save global pricing configurations
@@ -894,12 +935,14 @@ export default function App() {
     };
     setMovements(prev => [...prev, movement]);
     saveDocument('movements', movement);
+    showToast('Tabela de Preços Salva', `Configurações de mensalidades para o ano ${year} foram salvas.`, 'success');
   };
 
   // Handler: Update application security password
   const handleUpdatePassword = async (newPassword: string) => {
     setAppPassword(newPassword);
     await saveDocument('settings', { id: 'appPassword', value: newPassword });
+    showToast('Senha Atualizada', 'A nova senha de acesso ao sistema foi salva no Firebase.', 'success');
   };
 
   // Handler: Logout / Lock session
@@ -959,6 +1002,7 @@ export default function App() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    showToast('Backup Exportado', 'O arquivo JSON com a cópia de segurança foi baixado com sucesso.', 'info');
   };
 
   const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -970,7 +1014,7 @@ export default function App() {
       const data = JSON.parse(text);
 
       if (!data.students || !Array.isArray(data.students) || !data.enrollments || !Array.isArray(data.enrollments)) {
-        alert('Arquivo de backup inválido ou em formato incompatível.');
+        showToast('Arquivo Inválido', 'O arquivo de backup é incompatível ou está corrompido.', 'error', 5000);
         return;
       }
 
@@ -1009,11 +1053,11 @@ export default function App() {
       }
 
       setLoading(false);
-      alert('Backup restaurado com sucesso!');
+      showToast('Backup Restaurado', 'Todos os dados do arquivo JSON foram importados para o Firebase com sucesso.', 'success', 6000);
     } catch (err) {
       console.error('Erro ao restaurar backup:', err);
       setLoading(false);
-      alert('Erro ao processar o arquivo de backup. Verifique se é um arquivo JSON válido.');
+      showToast('Erro ao Restaurar Backup', 'Verifique se o arquivo importado é um JSON válido e estruturado.', 'error', 6000);
     }
     event.target.value = '';
   };
@@ -1329,6 +1373,9 @@ export default function App() {
           <div>Cerrado • Brasília, DF</div>
           <div className="italic font-serif text-brand-sand hidden sm:block">"Pedagogia do Encontro, Sustentabilidade e Amor ao Ritmo da Infância"</div>
         </footer>
+
+        {/* Global System Toast Notifications */}
+        <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
       </div>
     </div>
   );

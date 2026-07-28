@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import { REGULAR_CLASSES, getContraturnoPriceDynamic } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface RematriculaListProps {
   students: Student[];
@@ -105,9 +105,12 @@ export default function RematriculaList({
     setEditingNotesStudentId(null);
   };
 
+  const [copiedContact, setCopiedContact] = useState<string | null>(null);
+
   const handleCopyContact = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('Contato copiado para a área de transferência!');
+    setCopiedContact(text);
+    setTimeout(() => setCopiedContact(null), 2500);
   };
 
   return (
@@ -461,6 +464,20 @@ export default function RematriculaList({
           </table>
         </div>
       </div>
+
+      <AnimatePresence>
+        {copiedContact && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 border border-slate-700"
+          >
+            <Check size={14} className="text-emerald-400" />
+            <span>Contato <strong>{copiedContact}</strong> copiado com sucesso!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
