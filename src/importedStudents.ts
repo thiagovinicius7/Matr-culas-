@@ -127,7 +127,7 @@ export const IMPORTED_STUDENTS: Student[] = [
     nome: 'Rita Timo Batista de Castro Oliveira',
     nascimento: '2018-12-11',
     dataEntrada: '2026-01-26',
-    observacoes: 'Importado de Relatório de Turmas. Turno regular Uruçu (2º Ano), contraturno Marmelada.',
+    observacoes: 'Importado de Relatório de Turmas. Turno regular Iraí (3º Ano), contraturno Marmelada.',
     status: 'ativo'
   },
   {
@@ -1487,7 +1487,7 @@ export function getImportedEnrollments(): Enrollment[] {
     'Moana Bernardes Viana': { id: 'mandacaia_2', price: 1900 },
     'Pedro Towê de Vasconcelos Crispim': { id: 'abelha_branca', price: 2400 },
     'Radek Cordeiro Valença Rocha': { id: 'jatai', price: 2100 },
-    'Rita Timo Batista de Castro Oliveira': { id: 'urucu', price: 2200 },
+    'Rita Timo Batista de Castro Oliveira': { id: 'irai', price: 2300 },
     'Ruda Alexandre Nunes Portugal': { id: 'mandacaia_2', price: 1900 },
     'Samuel Rodrigues e Silva': { id: 'jatai', price: 2100 },
     'Vicente Nunes Ventura': { id: 'irai', price: 2300 },
@@ -1561,7 +1561,7 @@ export function getImportedEnrollments(): Enrollment[] {
       valorRegularOriginal: classInfo.price,
       descontoMensal: discount,
       valorFinalRegular: classInfo.price - discount,
-      statusNegociacao: idx % 3 === 0 ? 'Confirmada' : (idx % 3 === 1 ? 'Em Negociação' : 'Pendente'),
+      statusNegociacao: 'Confirmada',
       anotacoes: 'Importado de forma segura e fidedigna através do Relatório de Turmas do Sítio-Escola Geranium.'
     });
   });

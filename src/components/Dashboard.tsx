@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Student, Enrollment, ContraturnoSegment } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
-import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList, Database, RefreshCw, Trash2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList, Database, RefreshCw, Trash2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface DashboardProps {
   students: Student[];
@@ -24,6 +24,36 @@ export default function Dashboard({
   onClearDatabase 
 }: DashboardProps) {
   const [quickSearch, setQuickSearch] = useState('');
+  const [selectedClassForModal, setSelectedClassForModal] = useState<{
+    id: string;
+    nome: string;
+    natureza: string;
+    idadeRef: number;
+    valorMensal: number;
+  } | null>(null);
+  const [modalSearch, setModalSearch] = useState('');
+
+  const getModalClassStudents = () => {
+    if (!selectedClassForModal) return [];
+    const targetClassId = selectedClassForModal.id;
+    const classEnrollments = enrollments.filter(e => e.turmaRegularId === targetClassId);
+    return classEnrollments
+      .map(e => {
+        const student = students.find(s => s.id === e.alunoId);
+        const activeContraturno = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
+        return {
+          enrollment: e,
+          student,
+          contraturno: activeContraturno
+        };
+      })
+      .filter((item): item is { enrollment: Enrollment; student: Student; contraturno: ContraturnoSegment | undefined } => item.student !== undefined)
+      .filter(item => {
+        if (!modalSearch.trim()) return true;
+        return item.student.nome.toLowerCase().includes(modalSearch.toLowerCase());
+      })
+      .sort((a, b) => a.student.nome.localeCompare(b.student.nome, 'pt-BR'));
+  };
 
   // Stats calculations
   const activeStudents = students.filter(s => s.status === 'ativo');
@@ -394,16 +424,18 @@ export default function Dashboard({
               return (
                 <div 
                   key={cls.id} 
-                  className={`p-3 rounded-lg border transition-all flex items-center justify-between ${
+                  onClick={() => setSelectedClassForModal(cls)}
+                  className={`p-3 rounded-lg border transition-all flex items-center justify-between cursor-pointer group ${
                     isBenjoi 
-                      ? 'border-brand-orange bg-amber-50/70 shadow-xs ring-1 ring-brand-orange/20' 
-                      : 'border-slate-150 bg-slate-50 hover:bg-white'
+                      ? 'border-brand-orange bg-amber-50/70 shadow-xs ring-1 ring-brand-orange/20 hover:bg-amber-100/70 hover:shadow-sm' 
+                      : 'border-slate-150 bg-slate-50 hover:bg-white hover:border-brand-green-light hover:shadow-xs'
                   }`}
+                  title={`Clique para ver os alunos da turma ${cls.nome}`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${cls.natureza === 'Infantil' ? 'bg-brand-orange' : 'bg-brand-green-light'}`}></span>
-                      <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5 font-display">
+                      <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5 font-display group-hover:text-brand-green-dark">
                         {cls.nome}
                         {isBenjoi && (
                           <span className="px-1.5 py-0.5 bg-brand-orange text-white text-[8px] font-bold uppercase rounded tracking-wider animate-pulse leading-none">
@@ -421,19 +453,23 @@ export default function Dashboard({
                   </div>
                   
                   <div className="flex flex-col items-end font-display">
-                    <span className={`text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border ${
+                    <span className={`text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border transition-transform group-hover:scale-105 ${
                       isBenjoi ? 'bg-white border-brand-orange text-brand-orange' : 'bg-white border-slate-200 text-slate-700'
                     }`}>
                       {cls.count}
                     </span>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1">alunos</span>
+                    <span className="text-[9px] uppercase tracking-wider text-slate-400 mt-1 font-semibold group-hover:text-brand-orange">ver lista</span>
                   </div>
                 </div>
               );
             })}
 
             {contraturnoOnlyCount > 0 && (
-              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 shadow-xs flex items-center justify-between">
+              <div 
+                onClick={() => setSelectedClassForModal({ id: 'sem_regular', nome: 'Somente Contraturno', natureza: 'Isento', idadeRef: 0, valorMensal: 0 })}
+                className="p-3 rounded-lg border border-amber-200 bg-amber-50/70 shadow-xs flex items-center justify-between cursor-pointer hover:bg-amber-100/80 hover:border-amber-300 transition-all group"
+                title="Clique para ver os alunos somente no contraturno"
+              >
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
@@ -450,10 +486,10 @@ export default function Dashboard({
                 </div>
                 
                 <div className="flex flex-col items-end font-display">
-                  <span className="text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border bg-white border-amber-300 text-amber-900">
+                  <span className="text-xs font-bold w-8 h-8 rounded-full flex items-center justify-center shadow-xs border bg-white border-amber-300 text-amber-900 transition-transform group-hover:scale-105">
                     {contraturnoOnlyCount}
                   </span>
-                  <span className="text-[9px] uppercase tracking-wider text-amber-800 mt-1">alunos</span>
+                  <span className="text-[9px] uppercase tracking-wider text-amber-800 mt-1 font-semibold group-hover:text-amber-950">ver lista</span>
                 </div>
               </div>
             )}
@@ -481,6 +517,148 @@ export default function Dashboard({
           </button>
         </div>
       </div>
+
+      {/* Modal for Class Student List */}
+      <AnimatePresence>
+        {selectedClassForModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden border border-slate-200"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 bg-brand-green-dark text-white flex items-center justify-between border-b border-emerald-900/40">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-brand-orange text-white rounded-lg flex items-center justify-center shadow-xs font-bold text-sm">
+                    <Users size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-bold text-base sm:text-lg text-white">
+                        Turma {selectedClassForModal.nome}
+                      </h3>
+                      <span className="px-2 py-0.5 bg-brand-orange text-white text-[10px] font-extrabold uppercase rounded-full">
+                        {enrollments.filter(e => e.turmaRegularId === selectedClassForModal.id).length} Alunos
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-200 mt-0.5">
+                      {selectedClassForModal.id === 'sem_regular' 
+                        ? 'Estudantes matriculados exclusivamente no Contraturno'
+                        : `${selectedClassForModal.idadeRef} anos • ${selectedClassForModal.natureza} • ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedClassForModal.valorMensal)}/mês`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setSelectedClassForModal(null); setModalSearch(''); }}
+                  className="p-1.5 text-emerald-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                  title="Fechar"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Search inside modal */}
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                <Search size={14} className="text-slate-400 ml-1 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Buscar aluno nesta turma..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full text-xs bg-transparent border-none focus:outline-none text-slate-700 placeholder-slate-400 font-sans"
+                />
+                {modalSearch && (
+                  <button onClick={() => setModalSearch('')} className="text-xs text-slate-400 hover:text-slate-600 px-1 font-bold cursor-pointer">
+                    Limpar
+                  </button>
+                )}
+              </div>
+
+              {/* Student List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-50/50">
+                {getModalClassStudents().length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 space-y-2">
+                    <Users size={32} className="mx-auto text-slate-300" />
+                    <p className="text-xs font-semibold">Nenhum aluno encontrado nesta turma.</p>
+                  </div>
+                ) : (
+                  getModalClassStudents().map(({ student, enrollment, contraturno }, idx) => {
+                    const age = calculateAgeAtCutoff(student.nascimento, 2026);
+                    return (
+                      <div 
+                        key={student.id} 
+                        className="p-3.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs hover:border-brand-green-light transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-400 font-mono">{idx + 1}.</span>
+                            <h4 className="text-xs font-bold text-slate-900 font-display">{student.nome}</h4>
+                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-bold rounded">
+                              Confirmada
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                            <span>Idade: <strong className="text-slate-700 font-semibold">{age} anos</strong></span>
+                            {contraturno && (
+                              <span className="text-amber-800 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/60 text-[10px]">
+                                Contraturno: {contraturno.natureza} ({contraturno.periodo} • {contraturno.diasSemana.join(', ')})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+                          <button
+                            onClick={() => {
+                              setSelectedClassForModal(null);
+                              setModalSearch('');
+                              if (onNavigateWithStudent) {
+                                onNavigateWithStudent('students', student.id);
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-brand-cream hover:bg-brand-sand text-brand-green-dark border border-brand-sand text-[10px] font-bold rounded transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Ver Ficha do Aluno"
+                          >
+                            <FileText size={12} />
+                            Ficha
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedClassForModal(null);
+                              setModalSearch('');
+                              if (onNavigateWithStudent) {
+                                onNavigateWithStudent('rematricula', student.id);
+                              }
+                            }}
+                            className="px-2.5 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[10px] font-bold rounded transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Ver Acordo de Rematrícula"
+                          >
+                            <Calculator size={12} />
+                            Acordo
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-sans">
+                <span>Total no filtro: <strong className="font-semibold text-slate-800">{getModalClassStudents().length} aluno(s)</strong></span>
+                <button
+                  onClick={() => { setSelectedClassForModal(null); setModalSearch(''); }}
+                  className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -88,9 +88,31 @@ export default function App() {
         ]);
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        // Ensure all loaded enrollments are confirmed and Rita Timo is mapped to Iraí (6 students)
+        const updatedEnrollments = await Promise.all(
+          loadedEnrollments.map(async (e) => {
+            let changed = false;
+            let fixed = { ...e };
+            if (fixed.statusNegociacao !== 'Confirmada') {
+              fixed.statusNegociacao = 'Confirmada' as const;
+              changed = true;
+            }
+            if (fixed.alunoId === 'student_12430' && fixed.turmaRegularId !== 'irai') {
+              fixed.turmaRegularId = 'irai';
+              fixed.valorRegularOriginal = 2300;
+              fixed.valorFinalRegular = 2300;
+              changed = true;
+            }
+            if (changed) {
+              await saveDocument('enrollments', fixed);
+            }
+            return fixed;
+          })
+        );
+
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
-        setEnrollments(loadedEnrollments);
+        setEnrollments(updatedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
 
