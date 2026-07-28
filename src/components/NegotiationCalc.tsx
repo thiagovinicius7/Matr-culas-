@@ -142,7 +142,7 @@ export default function NegotiationCalc({
         setDiscountInput(0);
         setContraturnoDiscountType('reais');
         setContraturnoDiscountInput(0);
-        setNegotiationStatus('Confirmada');
+        setNegotiationStatus('Em Negociação');
         setNotes('');
         setAddLanche(false);
         setLancheValue(200);

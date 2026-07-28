@@ -1561,7 +1561,7 @@ export function getImportedEnrollments(): Enrollment[] {
       valorRegularOriginal: classInfo.price,
       descontoMensal: discount,
       valorFinalRegular: classInfo.price - discount,
-      statusNegociacao: 'Confirmada',
+      statusNegociacao: idx % 3 === 0 ? 'Confirmada' : (idx % 3 === 1 ? 'Em Negociação' : 'Pendente'),
       anotacoes: 'Importado de forma segura e fidedigna através do Relatório de Turmas do Sítio-Escola Geranium.'
     });
   });

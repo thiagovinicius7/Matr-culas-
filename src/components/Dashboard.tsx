@@ -60,15 +60,18 @@ export default function Dashboard({
   const totalStudentsCount = students.length;
   const activeStudentsCount = activeStudents.length;
 
-  // Rematrícula Funnel
-  const totalEnrollments = enrollments.length;
-  const confirmed = enrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
-  const negotiating = enrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
-  const pending = enrollments.filter(e => e.statusNegociacao === 'Pendente').length;
+  // Rematrícula Funnel - Filter to valid students only
+  const validStudentIds = new Set(students.map(s => s.id));
+  const validEnrollments = enrollments.filter(e => validStudentIds.has(e.alunoId));
 
-  const confirmedPct = totalEnrollments > 0 ? Math.round((confirmed / totalEnrollments) * 100) : 0;
-  const negotiatingPct = totalEnrollments > 0 ? Math.round((negotiating / totalEnrollments) * 100) : 0;
-  const pendingPct = totalEnrollments > 0 ? Math.round((pending / totalEnrollments) * 100) : 0;
+  const totalEnrollments = validEnrollments.length;
+  const confirmed = validEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
+  const negotiating = validEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
+  const pending = validEnrollments.filter(e => e.statusNegociacao === 'Pendente').length;
+
+  const confirmedPct = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmed / totalStudentsCount) * 100)) : 0;
+  const negotiatingPct = totalStudentsCount > 0 ? Math.round((negotiating / totalStudentsCount) * 100) : 0;
+  const pendingPct = totalStudentsCount > 0 ? Math.round((pending / totalStudentsCount) * 100) : 0;
 
   // Monthly Revenue Estimate (Regular + Contraturnos)
   const activeContraturnos = contraturnos.filter(c => c.dataFim === null);

@@ -88,31 +88,10 @@ export default function App() {
         ]);
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-        // Ensure all loaded enrollments are confirmed and Rita Timo is mapped to Iraí (6 students)
-        const updatedEnrollments = await Promise.all(
-          loadedEnrollments.map(async (e) => {
-            let changed = false;
-            let fixed = { ...e };
-            if (fixed.statusNegociacao !== 'Confirmada') {
-              fixed.statusNegociacao = 'Confirmada' as const;
-              changed = true;
-            }
-            if (fixed.alunoId === 'student_12430' && fixed.turmaRegularId !== 'irai') {
-              fixed.turmaRegularId = 'irai';
-              fixed.valorRegularOriginal = 2300;
-              fixed.valorFinalRegular = 2300;
-              changed = true;
-            }
-            if (changed) {
-              await saveDocument('enrollments', fixed);
-            }
-            return fixed;
-          })
-        );
 
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
-        setEnrollments(updatedEnrollments);
+        setEnrollments(loadedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
 
@@ -905,9 +884,11 @@ export default function App() {
   };
 
   const totalStudentsCount = students.length;
-  const confirmedEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && e.statusNegociacao === 'Confirmada').length;
-  const pendingEnrollmentsCount = enrollments.filter(e => e.ano === 2026 && (e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação')).length;
-  const confirmedPercent = totalStudentsCount > 0 ? Math.round((confirmedEnrollmentsCount / totalStudentsCount) * 100) : 0;
+  const validStudentIds = new Set(students.map(s => s.id));
+  const valid2026Enrollments = enrollments.filter(e => e.ano === 2026 && validStudentIds.has(e.alunoId));
+  const confirmedEnrollmentsCount = valid2026Enrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
+  const pendingEnrollmentsCount = valid2026Enrollments.filter(e => e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação').length;
+  const confirmedPercent = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmedEnrollmentsCount / totalStudentsCount) * 100)) : 0;
 
   if (loading) {
     return (
