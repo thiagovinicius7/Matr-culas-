@@ -129,58 +129,14 @@ export default function Dashboard({
         
         <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
           {/* Status badge */}
-          {students.some(s => s.id.startsWith('student_12')) ? (
-            <span className="px-2.5 py-1.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-md border border-emerald-200/60 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              67 Alunos Reais Sincronizados
-            </span>
-          ) : students.some(s => !s.id.startsWith('student_12')) ? (
-            <span className="px-2.5 py-1.5 bg-amber-50 text-amber-800 text-[10px] font-bold uppercase rounded-md border border-amber-200/60 flex items-center gap-1.5 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
-              Modo Demonstração (Exemplos)
-            </span>
-          ) : (
-            <span className="px-2.5 py-1.5 bg-slate-50 text-slate-700 text-[10px] font-bold uppercase rounded-md border border-slate-200/60 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              Base Vazia
-            </span>
-          )}
+          <span className="px-2.5 py-1.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-md border border-emerald-200/60 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Base Firebase: {students.length} Alunos Cadastrados
+          </span>
 
           <div className="text-[10px] uppercase tracking-wider font-bold bg-brand-sand text-brand-green-dark px-3 py-1.5 rounded-md border border-slate-200/60 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse"></span>
             Período Letivo: 2026
-          </div>
-
-          {/* Discrete Data controls for admin */}
-          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
-            {students.some(s => !s.id.startsWith('student_12')) && onClearDatabase && (
-              <button
-                onClick={() => {
-                  if (confirm('Tem certeza que deseja apagar todos os alunos cadastrados como exemplo? Isso removerá as 8 fichas fictícias do Firebase.')) {
-                    onClearDatabase();
-                  }
-                }}
-                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md border border-rose-100 hover:border-rose-200 transition-colors cursor-pointer"
-                title="Apagar Alunos de Exemplo"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-
-            {onImportGeraniumData && (
-              <button
-                onClick={onImportGeraniumData}
-                className={`px-2.5 py-1.5 text-[10px] font-bold uppercase rounded-md flex items-center gap-1 transition-colors cursor-pointer border ${
-                  students.some(s => s.id.startsWith('student_12'))
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-brand-orange text-white border-transparent hover:bg-brand-orange-hover'
-                }`}
-                title={students.some(s => s.id.startsWith('student_12')) ? 'Reimportar Lista Oficial' : 'Importar Lista Oficial de Alunos'}
-              >
-                <Database size={12} />
-                <span>{students.some(s => s.id.startsWith('student_12')) ? 'Reimportar' : 'Importar 67 Alunos Reais'}</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
