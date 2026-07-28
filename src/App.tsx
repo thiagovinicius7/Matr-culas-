@@ -89,9 +89,32 @@ export default function App() {
         
         const sortedStudents = loadedStudents.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
+        // Adjust class assignment for Pedro Towê (Iraí) and Rita Timo (Uruçu) if needed, keeping negotiation status & discounts intact
+        const adjustedEnrollments = loadedEnrollments.map(e => {
+          let changed = false;
+          let fixed = { ...e };
+          
+          if (fixed.alunoId === 'student_12376' && fixed.turmaRegularId !== 'irai') {
+            fixed.turmaRegularId = 'irai';
+            fixed.valorRegularOriginal = 2300;
+            fixed.valorFinalRegular = Math.max(0, 2300 - (fixed.descontoMensal || 0));
+            changed = true;
+          }
+          if (fixed.alunoId === 'student_12430' && fixed.turmaRegularId !== 'urucu') {
+            fixed.turmaRegularId = 'urucu';
+            fixed.valorRegularOriginal = 2200;
+            fixed.valorFinalRegular = Math.max(0, 2200 - (fixed.descontoMensal || 0));
+            changed = true;
+          }
+          if (changed) {
+            saveDocument('enrollments', fixed);
+          }
+          return fixed;
+        });
+
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
-        setEnrollments(loadedEnrollments);
+        setEnrollments(adjustedEnrollments);
         setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
 
