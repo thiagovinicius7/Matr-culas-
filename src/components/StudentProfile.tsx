@@ -22,6 +22,7 @@ interface StudentProfileProps {
   onDeleteGuardian: (id: string) => void;
   onUpdateGuardian: (guardian: Guardian) => void;
   onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
+  onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
 }
 
 export default function StudentProfile({
@@ -40,7 +41,8 @@ export default function StudentProfile({
   onAddGuardian,
   onDeleteGuardian,
   onUpdateGuardian,
-  onUpdateEnrollmentClass
+  onUpdateEnrollmentClass,
+  onUpdateContraturnoNatureza
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1138,11 +1140,27 @@ export default function StudentProfile({
                               isCurrentlyActive ? 'bg-orange-50/50 border-orange-200' : 'bg-slate-50 border-slate-150'
                             }`}
                           >
-                            <div className="flex justify-between items-center">
-                              <span className="font-bold text-xs text-slate-800">
-                                Contraturno: <strong className="text-orange-800 font-bold">{c.natureza}</strong> ({c.periodo})
-                              </span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                            <div className="flex justify-between items-center gap-2">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-xs text-slate-800">
+                                  Contraturno:
+                                </span>
+                                {isCurrentlyActive && onUpdateContraturnoNatureza ? (
+                                  <select
+                                    value={c.natureza}
+                                    onChange={(evt) => onUpdateContraturnoNatureza(activeStudent.id, c.id, evt.target.value as 'Melaço' | 'Marmelada')}
+                                    className="text-xs font-bold px-2 py-0.5 rounded border border-orange-300 bg-white text-orange-900 cursor-pointer focus:outline-none"
+                                    title="Alterar turma do contraturno"
+                                  >
+                                    <option value="Melaço">Melaço (Até 4)</option>
+                                    <option value="Marmelada">Marmelada (5+)</option>
+                                  </select>
+                                ) : (
+                                  <strong className="text-orange-800 font-bold text-xs">{c.natureza}</strong>
+                                )}
+                                <span className="text-xs text-slate-600">({c.periodo})</span>
+                              </div>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
                                 isCurrentlyActive ? 'bg-orange-100 text-orange-800' : 'bg-slate-200 text-slate-500'
                               }`}>
                                 {isCurrentlyActive ? 'Vigente' : 'Encerrado'}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Student, ContraturnoSegment, Enrollment, RegularClass } from '../types';
-import { Printer, CheckSquare, Search, Filter, ArrowUpDown, RotateCcw, X } from 'lucide-react';
+import { Printer, CheckSquare, Search, Filter, ArrowUpDown, RotateCcw, X, Info } from 'lucide-react';
 import { normalizeClassId, REGULAR_CLASSES } from '../data';
 
 interface ContraturnoScheduleProps {
@@ -8,6 +8,7 @@ interface ContraturnoScheduleProps {
   contraturnos: ContraturnoSegment[];
   enrollments?: Enrollment[];
   classPrices?: RegularClass[];
+  onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
 }
 
 type WeekDay = 'Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex';
@@ -16,7 +17,8 @@ export default function ContraturnoSchedule({
   students, 
   contraturnos,
   enrollments = [],
-  classPrices = []
+  classPrices = [],
+  onUpdateContraturnoNatureza
 }: ContraturnoScheduleProps) {
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
@@ -63,7 +65,7 @@ export default function ContraturnoSchedule({
     return cls ? cls.nome : 'Outra';
   };
 
-  // Horário de saída real: Parcial = até 15h, Completo = até 17h30
+  // Horário de saída string
   const horarioSaida = (periodo: 'Parcial' | 'Completo') => periodo === 'Parcial' ? 'Saída 15h' : 'Saída 17h30';
 
   // Group active contraturnos by day of week, deduplicated and sorted A-Z by student name
@@ -202,9 +204,8 @@ export default function ContraturnoSchedule({
                     <div className="space-y-1">
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Melaço</h4>
                       {melaco.map(a => (
-                        <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
-                          <span className="font-medium">• {a.student?.nome}</span>
-                          <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
+                        <div key={a.segment.id} className="text-[9px] font-medium">
+                          • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
                         </div>
                       ))}
                       {melaco.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
@@ -214,9 +215,8 @@ export default function ContraturnoSchedule({
                     <div className="space-y-1">
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Marmelada</h4>
                       {marmelada.map(a => (
-                        <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
-                          <span className="font-medium">• {a.student?.nome}</span>
-                          <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
+                        <div key={a.segment.id} className="text-[9px] font-medium">
+                          • {a.student?.nome}{a.segment.periodo === 'Parcial' ? ' *' : ''}
                         </div>
                       ))}
                       {marmelada.length === 0 && <p className="text-[9px] italic text-slate-400">Ninguém</p>}
@@ -225,6 +225,7 @@ export default function ContraturnoSchedule({
                 );
               })}
             </div>
+            <p className="text-[9px] italic text-slate-600 mt-2">* Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.</p>
           </div>
         ) : (
           /* MONTHLY MATRIX PRINT */
@@ -249,7 +250,9 @@ export default function ContraturnoSchedule({
                   {filteredAndSortedMatrix.map(({ segment: c, student, regularClass }) => {
                     return (
                       <tr key={c.id}>
-                        <td className="p-2 border-r border-slate-300 font-semibold">{student.nome}</td>
+                        <td className="p-2 border-r border-slate-300 font-semibold">
+                          {student.nome}{c.periodo === 'Parcial' ? ' *' : ''}
+                        </td>
                         <td className="p-2 border-r border-slate-300 text-slate-600">{regularClass}</td>
                         <td className="p-2 border-r border-slate-300">{c.natureza}</td>
                         {daysOfWeek.map(day => (
@@ -264,6 +267,7 @@ export default function ContraturnoSchedule({
                 </tbody>
               </table>
             </div>
+            <p className="text-[9px] italic text-slate-600 mt-2">* Crianças com saída antecipada às 15h (Parcial).</p>
           </div>
         )}
 
@@ -325,71 +329,120 @@ export default function ContraturnoSchedule({
 
       {/* Dynamic Views */}
       {viewMode === 'semanal' ? (
-        /* WEEKLY DIARY COLUMNS */
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3" id="weekly-columns-container">
-          {daysOfWeek.map((day) => {
-            const attendees = getAttendeesForDay(day);
-            const melaco = attendees.filter(a => a.segment.natureza === 'Melaço');
-            const marmelada = attendees.filter(a => a.segment.natureza === 'Marmelada');
+        <div className="space-y-3">
+          {/* Legend Banner */}
+          <div className="bg-amber-50/90 border border-amber-200/90 rounded-lg p-2.5 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <Info size={15} className="text-amber-600 shrink-0" />
+              <span>
+                <strong className="text-amber-900 font-bold">* Asterisco (*):</strong> Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-500 font-medium">
+              Altere a turma (Melaço / Marmelada) no próprio card do aluno ou na Matriz Geral.
+            </span>
+          </div>
 
-            return (
-              <div 
-                key={day} 
-                className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden flex flex-col min-h-[380px]"
-              >
-                <div className="p-3 bg-slate-50 border-b border-slate-200 text-center space-y-0.5">
-                  <h4 className="font-sans font-bold text-slate-800 text-xs">{dayNamesFull[day]}</h4>
-                  <span className="inline-block text-[9px] uppercase tracking-wide font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
-                    {attendees.length} {attendees.length === 1 ? 'aluno' : 'alunos'}
-                  </span>
-                </div>
+          {/* WEEKLY DIARY COLUMNS */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3" id="weekly-columns-container">
+            {daysOfWeek.map((day) => {
+              const attendees = getAttendeesForDay(day);
+              const melaco = attendees.filter(a => a.segment.natureza === 'Melaço');
+              const marmelada = attendees.filter(a => a.segment.natureza === 'Marmelada');
 
-                <div className="p-3 space-y-4 flex-1 divide-y divide-slate-150">
-                  {/* Melaço block (under 4) */}
-                  <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
-                      <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                      Melaço (Até 4) ({melaco.length})
+              return (
+                <div 
+                  key={day} 
+                  className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden flex flex-col min-h-[380px]"
+                >
+                  <div className="p-3 bg-slate-50 border-b border-slate-200 text-center space-y-0.5">
+                    <h4 className="font-sans font-bold text-slate-800 text-xs">{dayNamesFull[day]}</h4>
+                    <span className="inline-block text-[9px] uppercase tracking-wide font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded">
+                      {attendees.length} {attendees.length === 1 ? 'aluno' : 'alunos'}
                     </span>
-                    <div className="space-y-1">
-                      {melaco.map(({ segment, student }) => (
-                        <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-100 hover:bg-white transition-all space-y-1">
-                          <span className="font-bold text-[11px] text-slate-800 block leading-tight">{student?.nome}</span>
-                          <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-slate-200 text-slate-700">
-                            {horarioSaida(segment.periodo)}
-                          </span>
-                        </div>
-                      ))}
-                      {melaco.length === 0 && (
-                        <p className="text-[10px] text-slate-400 italic text-center py-2">Nenhum ativo.</p>
-                      )}
-                    </div>
                   </div>
 
-                  {/* Marmelada block (5+) */}
-                  <div className="space-y-1.5 pt-3">
-                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                      Marmelada (5+) ({marmelada.length})
-                    </span>
-                    <div className="space-y-1">
-                      {marmelada.map(({ segment, student }) => (
-                        <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-100 hover:bg-white transition-all space-y-1">
-                          <span className="font-bold text-[11px] text-slate-800 block leading-tight">{student?.nome}</span>
-                          <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-slate-200 text-slate-700">
-                            {horarioSaida(segment.periodo)}
-                          </span>
-                        </div>
-                      ))}
-                      {marmelada.length === 0 && (
-                        <p className="text-[10px] text-slate-400 italic text-center py-2">Nenhum ativo.</p>
-                      )}
+                  <div className="p-3 space-y-4 flex-1 divide-y divide-slate-150">
+                    {/* Melaço block (under 4) */}
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center justify-between bg-slate-100 px-2 py-0.5 rounded">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                          Melaço (Até 4)
+                        </span>
+                        <span>({melaco.length})</span>
+                      </span>
+                      <div className="space-y-1">
+                        {melaco.map(({ segment, student }) => (
+                          <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:shadow-2xs transition-all flex items-center justify-between gap-1">
+                            <span className="font-bold text-[11px] text-slate-800 block leading-tight">
+                              {student?.nome}
+                              {segment.periodo === 'Parcial' && (
+                                <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                              )}
+                            </span>
+
+                            {onUpdateContraturnoNatureza && (
+                              <select
+                                value={segment.natureza}
+                                onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
+                                className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
+                                title="Trocar turma de contraturno"
+                              >
+                                <option value="Melaço">Melaço</option>
+                                <option value="Marmelada">Marmelada</option>
+                              </select>
+                            )}
+                          </div>
+                        ))}
+                        {melaco.length === 0 && (
+                          <p className="text-[10px] text-slate-400 italic text-center py-2">Nenhum ativo.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Marmelada block (5+) */}
+                    <div className="space-y-1.5 pt-3">
+                      <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center justify-between bg-slate-100 px-2 py-0.5 rounded">
+                        <span className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                          Marmelada (5+)
+                        </span>
+                        <span>({marmelada.length})</span>
+                      </span>
+                      <div className="space-y-1">
+                        {marmelada.map(({ segment, student }) => (
+                          <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:shadow-2xs transition-all flex items-center justify-between gap-1">
+                            <span className="font-bold text-[11px] text-slate-800 block leading-tight">
+                              {student?.nome}
+                              {segment.periodo === 'Parcial' && (
+                                <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                              )}
+                            </span>
+
+                            {onUpdateContraturnoNatureza && (
+                              <select
+                                value={segment.natureza}
+                                onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
+                                className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
+                                title="Trocar turma de contraturno"
+                              >
+                                <option value="Melaço">Melaço</option>
+                                <option value="Marmelada">Marmelada</option>
+                              </select>
+                            )}
+                          </div>
+                        ))}
+                        {marmelada.length === 0 && (
+                          <p className="text-[10px] text-slate-400 italic text-center py-2">Nenhum ativo.</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       ) : (
         /* GENERAL MATRIX / CHECKLIST VIEW WITH ADVANCED FILTERS */
@@ -533,18 +586,39 @@ export default function ContraturnoSchedule({
                 {filteredAndSortedMatrix.map(({ segment: c, student, regularClass }) => {
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="p-3 font-bold text-slate-800">{student.nome}</td>
+                      <td className="p-3 font-bold text-slate-800">
+                        {student.nome}
+                        {c.periodo === 'Parcial' && (
+                          <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                        )}
+                      </td>
                       <td className="p-3 font-semibold text-slate-600">
                         <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 text-[11px]">
                           {regularClass}
                         </span>
                       </td>
                       <td className="p-3">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                          c.natureza === 'Melaço' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                        }`}>
-                          {c.natureza}
-                        </span>
+                        {onUpdateContraturnoNatureza ? (
+                          <select
+                            value={c.natureza}
+                            onChange={(e) => onUpdateContraturnoNatureza(student.id, c.id, e.target.value as 'Melaço' | 'Marmelada')}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded border cursor-pointer focus:outline-none ${
+                              c.natureza === 'Melaço' 
+                                ? 'bg-orange-100 text-orange-900 border-orange-300 hover:bg-orange-200' 
+                                : 'bg-emerald-100 text-emerald-900 border-emerald-300 hover:bg-emerald-200'
+                            }`}
+                            title="Clique para alterar a turma do contraturno"
+                          >
+                            <option value="Melaço">Melaço (Até 4)</option>
+                            <option value="Marmelada">Marmelada (5+)</option>
+                          </select>
+                        ) : (
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                            c.natureza === 'Melaço' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {c.natureza}
+                          </span>
+                        )}
                       </td>
                       {daysOfWeek.map(day => {
                         const attends = c.diasSemana.includes(day);

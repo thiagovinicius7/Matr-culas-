@@ -810,6 +810,23 @@ export default function App() {
     showToast('Descontos Salvos', `Novos valores negociados para ${stName} foram salvos com sucesso.`, 'success');
   };
 
+  // Handler: Change Contraturno group/natureza ('Melaço' vs 'Marmelada')
+  const handleUpdateContraturnoNatureza = (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => {
+    setContraturnos(prev => prev.map(c => {
+      if (c.id === segmentId || (c.alunoId === alunoId && c.dataFim === null)) {
+        const updated = { ...c, natureza: newNatureza };
+        saveDocument('contraturnos', updated);
+        return updated;
+      }
+      return c;
+    }));
+
+    const student = students.find(s => s.id === alunoId);
+    if (student) {
+      showToast('Turma do Contraturno Alterada', `A turma do contraturno de ${student.nome} foi alterada para ${newNatureza}.`, 'success');
+    }
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1317,6 +1334,7 @@ export default function App() {
                   onDeleteGuardian={handleDeleteGuardian}
                   onUpdateGuardian={handleUpdateGuardian}
                   onUpdateEnrollmentClass={handleUpdateEnrollmentClass}
+                  onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
                 />
               )}
               {activeTab === 'negotiation' && (
@@ -1352,6 +1370,7 @@ export default function App() {
                   contraturnos={contraturnos} 
                   enrollments={enrollments}
                   classPrices={classPrices}
+                  onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
                 />
               )}
               {activeTab === 'pricing' && (
