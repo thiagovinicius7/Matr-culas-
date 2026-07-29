@@ -9,6 +9,7 @@ interface ContraturnoScheduleProps {
   enrollments?: Enrollment[];
   classPrices?: RegularClass[];
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
+  onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: WeekDay[]) => void;
 }
 
 type WeekDay = 'Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex';
@@ -18,7 +19,8 @@ export default function ContraturnoSchedule({
   contraturnos,
   enrollments = [],
   classPrices = [],
-  onUpdateContraturnoNatureza
+  onUpdateContraturnoNatureza,
+  onUpdateContraturnoDays
 }: ContraturnoScheduleProps) {
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
@@ -624,11 +626,33 @@ export default function ContraturnoSchedule({
                         const attends = c.diasSemana.includes(day);
                         return (
                           <td key={day} className="p-3 text-center">
-                            <span className={`w-5 h-5 rounded inline-flex items-center justify-center font-bold text-xs ${
-                              attends ? 'bg-emerald-600 text-white border border-emerald-600' : 'text-slate-300 font-light'
-                            }`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!onUpdateContraturnoDays) return;
+                                const current = c.diasSemana || [];
+                                let updatedDays: WeekDay[];
+                                if (current.includes(day)) {
+                                  if (current.length === 1) return; // Keep at least 1 day
+                                  updatedDays = current.filter(d => d !== day);
+                                } else {
+                                  updatedDays = [...current, day];
+                                }
+                                const sortedDays = daysOfWeek.filter(d => updatedDays.includes(d));
+                                onUpdateContraturnoDays(student.id, c.id, sortedDays);
+                              }}
+                              disabled={!onUpdateContraturnoDays}
+                              title={onUpdateContraturnoDays ? (attends ? `Clique para remover ${day}` : `Clique para incluir ${day}`) : undefined}
+                              className={`w-6 h-6 rounded inline-flex items-center justify-center font-bold text-xs transition-all ${
+                                onUpdateContraturnoDays ? 'cursor-pointer hover:scale-110' : 'cursor-default'
+                              } ${
+                                attends 
+                                  ? 'bg-emerald-600 text-white border border-emerald-600 shadow-2xs hover:bg-emerald-700' 
+                                  : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200 hover:text-slate-600'
+                              }`}
+                            >
                               {attends ? '✓' : '•'}
-                            </span>
+                            </button>
                           </td>
                         );
                       })}

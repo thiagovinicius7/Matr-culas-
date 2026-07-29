@@ -23,6 +23,7 @@ interface StudentProfileProps {
   onUpdateGuardian: (guardian: Guardian) => void;
   onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
+  onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => void;
 }
 
 export default function StudentProfile({
@@ -42,7 +43,8 @@ export default function StudentProfile({
   onDeleteGuardian,
   onUpdateGuardian,
   onUpdateEnrollmentClass,
-  onUpdateContraturnoNatureza
+  onUpdateContraturnoNatureza,
+  onUpdateContraturnoDays
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1167,9 +1169,42 @@ export default function StudentProfile({
                               </span>
                             </div>
 
-                            <p className="text-[10px] text-slate-500 mt-1 font-semibold">
-                              Dias: {c.diasSemana.join(', ')} ({c.diasSemana.length}x na semana)
-                            </p>
+                            <div className="mt-2 text-[10px] text-slate-500 font-semibold">
+                              <span className="block mb-1">Dias: {c.diasSemana.join(', ')} ({c.diasSemana.length}x na semana)</span>
+                              {isCurrentlyActive && onUpdateContraturnoDays && (
+                                <div className="flex items-center gap-1 flex-wrap mt-1">
+                                  {(['Seg', 'Ter', 'Qua', 'Qui', 'Sex'] as const).map(d => {
+                                    const active = c.diasSemana.includes(d);
+                                    return (
+                                      <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => {
+                                          const current = c.diasSemana || [];
+                                          let updated: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[];
+                                          if (current.includes(d)) {
+                                            if (current.length === 1) return;
+                                            updated = current.filter(x => x !== d);
+                                          } else {
+                                            updated = [...current, d];
+                                          }
+                                          const allDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'] as const;
+                                          const sorted = allDays.filter(x => updated.includes(x));
+                                          onUpdateContraturnoDays(activeStudent.id, c.id, [...sorted]);
+                                        }}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                                          active 
+                                            ? 'bg-emerald-600 text-white shadow-2xs' 
+                                            : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+                                        }`}
+                                      >
+                                        {d}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
 
                             <p className="text-[10px] text-slate-400 mt-1">
                               Vigência: {new Date(c.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} {c.dataFim ? `até ${new Date(c.dataFim + 'T00:00:00').toLocaleDateString('pt-BR')}` : '(Ativo)'}

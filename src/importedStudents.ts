@@ -1583,6 +1583,21 @@ export function getImportedContraturnos(): ContraturnoSegment[] {
   ];
 
   marmeladaStudentIds.forEach((studentId, idx) => {
+    // Douglas Kennedy explicit requirement: Ter, Qua, Qui
+    if (studentId === 'student_12374') {
+      contraturnos.push({
+        id: `contr_imp_${studentId}`,
+        alunoId: studentId,
+        natureza: 'Marmelada',
+        periodo: 'Completo',
+        diasSemana: ['Ter', 'Qua', 'Qui'],
+        dataInicio: '2026-02-02',
+        dataFim: null,
+        valorMensal: 1250
+      });
+      return;
+    }
+
     const isParcial = idx % 2 === 0;
     const isThreeDays = idx % 3 === 0;
     const dias = isThreeDays ? ['Seg', 'Qua', 'Sex'] : ['Ter', 'Qui'] as any[];

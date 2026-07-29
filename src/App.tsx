@@ -134,10 +134,24 @@ export default function App() {
           }
         }
 
+        // Ensure Douglas Kennedy is set to 3 days (Ter, Qua, Qui) if present
+        const sanitizedContraturnos = loadedContraturnos.map(c => {
+          const isDouglas = c.alunoId === 'student_12374' || sortedStudents.find(s => s.id === c.alunoId)?.nome.includes('Douglas Kennedy');
+          if (isDouglas && c.dataFim === null) {
+            const hasCorrectDays = c.diasSemana.length === 3 && c.diasSemana.includes('Ter') && c.diasSemana.includes('Qua') && c.diasSemana.includes('Qui');
+            if (!hasCorrectDays) {
+              const updated = { ...c, diasSemana: ['Ter', 'Qua', 'Qui'] as ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[] };
+              saveDocument('contraturnos', updated);
+              return updated;
+            }
+          }
+          return c;
+        });
+
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
         setEnrollments(finalEnrollments);
-        setContraturnos(loadedContraturnos);
+        setContraturnos(sanitizedContraturnos);
         setMovements(loadedMovements);
 
         // Process loaded settings
@@ -827,6 +841,32 @@ export default function App() {
     }
   };
 
+  // Handler: Change Contraturno days of week
+  const handleUpdateContraturnoDays = (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => {
+    setContraturnos(prev => prev.map(c => {
+      if (c.id === segmentId || (c.alunoId === alunoId && c.dataFim === null)) {
+        const isParcial = c.periodo === 'Parcial';
+        const numDays = newDays.length;
+        let price = c.valorMensal;
+        if (numDays === 1) price = isParcial ? 350 : 550;
+        else if (numDays === 2) price = isParcial ? 550 : 900;
+        else if (numDays === 3) price = isParcial ? 750 : 1250;
+        else if (numDays === 4) price = isParcial ? 950 : 1550;
+        else if (numDays === 5) price = isParcial ? 1150 : 1850;
+
+        const updated = { ...c, diasSemana: newDays, valorMensal: price };
+        saveDocument('contraturnos', updated);
+        return updated;
+      }
+      return c;
+    }));
+
+    const student = students.find(s => s.id === alunoId);
+    if (student) {
+      showToast('Dias do Contraturno Atualizados', `Os dias de frequência do contraturno de ${student.nome} foram atualizados.`, 'success');
+    }
+  };
+
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
     const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
@@ -1335,6 +1375,7 @@ export default function App() {
                   onUpdateGuardian={handleUpdateGuardian}
                   onUpdateEnrollmentClass={handleUpdateEnrollmentClass}
                   onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
+                  onUpdateContraturnoDays={handleUpdateContraturnoDays}
                 />
               )}
               {activeTab === 'negotiation' && (
@@ -1371,6 +1412,7 @@ export default function App() {
                   enrollments={enrollments}
                   classPrices={classPrices}
                   onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
+                  onUpdateContraturnoDays={handleUpdateContraturnoDays}
                 />
               )}
               {activeTab === 'pricing' && (
