@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Student, Enrollment, ContraturnoSegment } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId } from '../data';
 import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList, Database, RefreshCw, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -33,19 +33,19 @@ export default function Dashboard({
   } | null>(null);
   const [modalSearch, setModalSearch] = useState('');
 
-  // Helper to accurately resolve effective regular class for any student
+  // Helper to accurately resolve effective regular class for any student (stripping 2026_ prefix if present)
   const getStudentClassId = (student: Student): string => {
     const e = enrollments.find(e => e.alunoId === student.id);
     if (e && e.turmaRegularId) {
-      return e.turmaRegularId;
+      return normalizeClassId(e.turmaRegularId);
     }
     const age = calculateAgeAtCutoff(student.nascimento, 2026);
-    return getRegularClassForAge(age).id;
+    return normalizeClassId(getRegularClassForAge(age).id);
   };
 
   const getModalClassStudents = () => {
     if (!selectedClassForModal) return [];
-    const targetClassId = selectedClassForModal.id;
+    const targetClassId = normalizeClassId(selectedClassForModal.id);
 
     return students
       .filter(student => getStudentClassId(student) === targetClassId)
@@ -75,7 +75,7 @@ export default function Dashboard({
       .sort((a, b) => a.student.nome.localeCompare(b.student.nome, 'pt-BR'));
   };
 
-  // Map of student counts per class ID across all students
+  // Map of student counts per normalized class ID across all students
   const studentCountByClassId: Record<string, number> = {};
   students.forEach(student => {
     const classId = getStudentClassId(student);
@@ -108,7 +108,7 @@ export default function Dashboard({
   const regularRevenueGross = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
-      const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+      const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
       return sum + e.valorFinalRegular + lancheVal + almocoVal;
@@ -118,7 +118,7 @@ export default function Dashboard({
   const regularRevenueWithDiscount = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
-      const regularClass = REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+      const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
       const subtotal = e.valorFinalRegular + lancheVal + almocoVal;
@@ -132,9 +132,10 @@ export default function Dashboard({
 
   // Distribution by Class
   const classDistribution = REGULAR_CLASSES.map(cls => {
+    const normId = normalizeClassId(cls.id);
     return {
       ...cls,
-      count: studentCountByClassId[cls.id] || 0
+      count: studentCountByClassId[normId] || 0
     };
   });
 
@@ -525,7 +526,7 @@ export default function Dashboard({
                         Turma {selectedClassForModal.nome}
                       </h3>
                       <span className="px-2 py-0.5 bg-brand-orange text-white text-[10px] font-extrabold uppercase rounded-full">
-                        {studentCountByClassId[selectedClassForModal.id] || 0} Alunos
+                        {studentCountByClassId[normalizeClassId(selectedClassForModal.id)] || 0} Alunos
                       </span>
                     </div>
                     <p className="text-xs text-emerald-200 mt-0.5">

@@ -8,7 +8,8 @@ import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, R
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
-  REGULAR_CLASSES
+  REGULAR_CLASSES,
+  normalizeClassId
 } from './data';
 import {
   seedDatabaseIfEmpty,
@@ -591,7 +592,7 @@ export default function App() {
     // Find current total monthly rates to compute before/after difference in statement log
     const currentEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
     const activeCont = contraturnos.find(c => c.alunoId === alunoId && c.dataFim === null);
-    const prevRegularClass = currentEnrollment ? (classPrices.find(rc => rc.id === currentEnrollment.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === currentEnrollment.turmaRegularId)) : null;
+    const prevRegularClass = currentEnrollment ? (classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId))) : null;
     const prevLanche = (currentEnrollment?.adicionarLanche && prevRegularClass?.natureza === 'Fundamental') ? (currentEnrollment.valorLanche || 0) : 0;
     const previousTotal = (currentEnrollment?.valorFinalRegular || 0) + (activeCont?.valorMensal || 0) + prevLanche;
 
@@ -662,7 +663,7 @@ export default function App() {
     }
 
     // 3. Log Financial Statement Movement
-    const currentRegularClass = classPrices.find(rc => rc.id === enrollmentData.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === enrollmentData.turmaRegularId);
+    const currentRegularClass = classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(enrollmentData.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(enrollmentData.turmaRegularId));
     const newLanche = (enrollmentData.adicionarLanche && currentRegularClass?.natureza === 'Fundamental') ? (enrollmentData.valorLanche || 0) : 0;
     const newTotal = enrollmentData.valorFinalRegular + (contraturnoData ? contraturnoData.valorMensal : 0) + newLanche;
     
@@ -712,7 +713,7 @@ export default function App() {
     const student = students.find(s => s.id === alunoId);
     if (currentEnroll && student) {
       const activeCont = contraturnos.find(c => c.alunoId === alunoId && c.dataFim === null);
-      const regularClass = classPrices.find(rc => rc.id === currentEnroll.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === currentEnroll.turmaRegularId);
+      const regularClass = classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnroll.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnroll.turmaRegularId));
       const lancheVal = (currentEnroll.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (currentEnroll.valorLanche || 0) : 0;
       const totalRate = currentEnroll.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0) + lancheVal;
 
@@ -811,7 +812,7 @@ export default function App() {
 
   // Handler: Change regular class manually (exceptional case)
   const handleUpdateEnrollmentClass = (alunoId: string, turmaRegularId: string) => {
-    const match = classPrices.find(c => c.id === turmaRegularId) || REGULAR_CLASSES.find(c => c.id === turmaRegularId);
+    const match = classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId)) || REGULAR_CLASSES.find(c => normalizeClassId(c.id) === normalizeClassId(turmaRegularId));
     const basePrice = match ? match.valorMensal : 0;
 
     setEnrollments(prev => prev.map(e => {

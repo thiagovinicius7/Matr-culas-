@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge } from '../data';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId } from '../data';
 import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
@@ -953,7 +953,7 @@ export default function StudentProfile({
                       const isOnlyContraturno = e.turmaRegularId === 'sem_regular';
                       const regularClass = isOnlyContraturno 
                         ? null 
-                        : (classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId) || suggestedClass);
+                        : (classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || suggestedClass);
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
@@ -969,13 +969,13 @@ export default function StudentProfile({
                                 </span>
                               ) : (
                                 <select
-                                  value={overrideClassId || e.turmaRegularId}
-                                  onChange={(evt) => setOverrideClassId(evt.target.value)}
+                                  value={normalizeClassId(overrideClassId || e.turmaRegularId)}
+                                  onChange={(evt) => setOverrideClassId(normalizeClassId(evt.target.value))}
                                   className="text-xs px-2 py-1 bg-white border border-slate-300 rounded-md focus:outline-none"
                                 >
                                   <option value="sem_regular">Somente Contraturno (Isento do Regular)</option>
                                   {(classPrices.length > 0 ? classPrices : REGULAR_CLASSES).map((cls) => (
-                                    <option key={cls.id} value={cls.id}>
+                                    <option key={cls.id} value={normalizeClassId(cls.id)}>
                                       {cls.nome} (R$ {cls.valorMensal})
                                     </option>
                                   ))}

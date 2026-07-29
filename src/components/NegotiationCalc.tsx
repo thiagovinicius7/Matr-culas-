@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, ContraturnoNature, ContraturnoPeriod, RegularClass, ContraturnoPrice } from '../types';
-import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic } from '../data';
+import { calculateAgeAtCutoff, getRegularClassForAgeDynamic, getContraturnoPriceDynamic, normalizeClassId } from '../data';
 import { Calculator, CheckCircle2, Shield, AlertTriangle, Sparkles, FileText, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -86,7 +86,7 @@ export default function NegotiationCalc({
   const currentTurmaRegularId = existingEnrollment ? existingEnrollment.turmaRegularId : null;
   const regularClass = selectedStudent 
     ? (currentTurmaRegularId && currentTurmaRegularId !== 'sem_regular'
-        ? (classPrices.find(c => c.id === currentTurmaRegularId) || getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
+        ? (classPrices.find(c => normalizeClassId(c.id) === normalizeClassId(currentTurmaRegularId)) || getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
         : getRegularClassForAgeDynamic(studentAge, classPrices, selectedYear)) 
     : null;
 

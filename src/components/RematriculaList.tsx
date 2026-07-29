@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
-import { REGULAR_CLASSES, getContraturnoPriceDynamic } from '../data';
+import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId } from '../data';
 import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -64,7 +64,7 @@ export default function RematriculaList({
   const rematriculaData = yearEnrollments.map(e => {
     const student = students.find(s => s.id === e.alunoId);
     const financialGuardian = guardians.find(g => g.alunoId === e.alunoId && g.financeiro);
-    const regularClass = classPrices.find(rc => rc.id === e.turmaRegularId) || REGULAR_CLASSES.find(rc => rc.id === e.turmaRegularId);
+    const regularClass = classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
     
     // Check if they have an active contraturno
     const activeCont = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);

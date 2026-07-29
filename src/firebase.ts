@@ -87,8 +87,8 @@ export async function seedDatabaseIfEmpty() {
     handleFirestoreError(error, OperationType.GET, 'students');
   }
 
-  // We seed if it is empty OR if it contains the old mock student "student_1"
-  const needsSeeding = studentsSnap.empty || studentsSnap.docs.some(d => d.id === 'student_1');
+  // We seed if it is empty, if it contains old mock student "student_1", or if student count is less than 60
+  const needsSeeding = studentsSnap.empty || studentsSnap.docs.some(d => d.id === 'student_1') || studentsSnap.size < 60;
   
   if (!needsSeeding) {
     console.log('Database already populated with official Sítio Geranium data. Skipping seed.');

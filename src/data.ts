@@ -35,6 +35,12 @@ export function calculateAgeAtCutoff(birthdateStr: string, enrollmentYear: numbe
   return age;
 }
 
+// Helper to strip any year prefix (e.g. '2026_mirim_1' -> 'mirim_1')
+export function normalizeClassId(id: string | null | undefined): string {
+  if (!id) return '';
+  return id.replace(/^\d{4}_/, '');
+}
+
 // Auto-determine regular class based on age
 export function getRegularClassForAge(age: number): RegularClass {
   if (age <= 2) return REGULAR_CLASSES[0]; // Mirim 1
