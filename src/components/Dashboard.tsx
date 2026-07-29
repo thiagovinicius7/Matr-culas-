@@ -33,27 +33,54 @@ export default function Dashboard({
   } | null>(null);
   const [modalSearch, setModalSearch] = useState('');
 
+  // Helper to accurately resolve effective regular class for any student
+  const getStudentClassId = (student: Student): string => {
+    const e = enrollments.find(e => e.alunoId === student.id);
+    if (e && e.turmaRegularId) {
+      return e.turmaRegularId;
+    }
+    const age = calculateAgeAtCutoff(student.nascimento, 2026);
+    return getRegularClassForAge(age).id;
+  };
+
   const getModalClassStudents = () => {
     if (!selectedClassForModal) return [];
     const targetClassId = selectedClassForModal.id;
-    const classEnrollments = enrollments.filter(e => e.turmaRegularId === targetClassId);
-    return classEnrollments
-      .map(e => {
-        const student = students.find(s => s.id === e.alunoId);
-        const activeContraturno = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
+
+    return students
+      .filter(student => getStudentClassId(student) === targetClassId)
+      .map(student => {
+        const e = enrollments.find(e => e.alunoId === student.id) || {
+          id: `enroll_auto_${student.id}`,
+          alunoId: student.id,
+          ano: 2026,
+          turmaRegularId: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).id,
+          valorRegularOriginal: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).valorMensal,
+          descontoMensal: 0,
+          valorFinalRegular: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).valorMensal,
+          statusNegociacao: 'Pendente',
+          anotacoes: 'Matrícula Sítio Geranium'
+        };
+        const activeContraturno = contraturnos.find(c => c.alunoId === student.id && c.dataFim === null);
         return {
           enrollment: e,
           student,
           contraturno: activeContraturno
         };
       })
-      .filter((item): item is { enrollment: Enrollment; student: Student; contraturno: ContraturnoSegment | undefined } => item.student !== undefined)
       .filter(item => {
         if (!modalSearch.trim()) return true;
         return item.student.nome.toLowerCase().includes(modalSearch.toLowerCase());
       })
       .sort((a, b) => a.student.nome.localeCompare(b.student.nome, 'pt-BR'));
   };
+
+  // Map of student counts per class ID across all students
+  const studentCountByClassId: Record<string, number> = {};
+  students.forEach(student => {
+    const classId = getStudentClassId(student);
+    studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
+  });
 
   // Stats calculations
   const activeStudents = students.filter(s => s.status === 'ativo');
@@ -105,14 +132,13 @@ export default function Dashboard({
 
   // Distribution by Class
   const classDistribution = REGULAR_CLASSES.map(cls => {
-    const enrolledInClass = enrollments.filter(e => e.turmaRegularId === cls.id).length;
     return {
       ...cls,
-      count: enrolledInClass
+      count: studentCountByClassId[cls.id] || 0
     };
   });
 
-  const contraturnoOnlyCount = enrollments.filter(e => e.turmaRegularId === 'sem_regular').length;
+  const contraturnoOnlyCount = studentCountByClassId['sem_regular'] || 0;
 
   return (
     <div className="space-y-6" id="dashboard-container">
@@ -499,7 +525,7 @@ export default function Dashboard({
                         Turma {selectedClassForModal.nome}
                       </h3>
                       <span className="px-2 py-0.5 bg-brand-orange text-white text-[10px] font-extrabold uppercase rounded-full">
-                        {enrollments.filter(e => e.turmaRegularId === selectedClassForModal.id).length} Alunos
+                        {studentCountByClassId[selectedClassForModal.id] || 0} Alunos
                       </span>
                     </div>
                     <p className="text-xs text-emerald-200 mt-0.5">

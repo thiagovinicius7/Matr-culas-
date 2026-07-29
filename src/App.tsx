@@ -129,7 +129,7 @@ export default function App() {
               anotacoes: 'Matrícula Sítio Geranium'
             };
             finalEnrollments.push(newE);
-            saveDocument('enrollments', newE);
+            await saveDocument('enrollments', newE);
           }
         }
 
