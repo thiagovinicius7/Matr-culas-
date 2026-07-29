@@ -134,24 +134,10 @@ export default function App() {
           }
         }
 
-        // Ensure Douglas Kennedy is set to 3 days (Ter, Qua, Qui) if present
-        const sanitizedContraturnos = loadedContraturnos.map(c => {
-          const isDouglas = c.alunoId === 'student_12374' || sortedStudents.find(s => s.id === c.alunoId)?.nome.includes('Douglas Kennedy');
-          if (isDouglas && c.dataFim === null) {
-            const hasCorrectDays = c.diasSemana.length === 3 && c.diasSemana.includes('Ter') && c.diasSemana.includes('Qua') && c.diasSemana.includes('Qui');
-            if (!hasCorrectDays) {
-              const updated = { ...c, diasSemana: ['Ter', 'Qua', 'Qui'] as ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[] };
-              saveDocument('contraturnos', updated);
-              return updated;
-            }
-          }
-          return c;
-        });
-
         setStudents(sortedStudents);
         setGuardians(loadedGuardians);
         setEnrollments(finalEnrollments);
-        setContraturnos(sanitizedContraturnos);
+        setContraturnos(loadedContraturnos);
         setMovements(loadedMovements);
 
         // Process loaded settings
