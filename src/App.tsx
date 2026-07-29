@@ -1350,6 +1350,8 @@ export default function App() {
                 <ContraturnoSchedule 
                   students={students} 
                   contraturnos={contraturnos} 
+                  enrollments={enrollments}
+                  classPrices={classPrices}
                 />
               )}
               {activeTab === 'pricing' && (

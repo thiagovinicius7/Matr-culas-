@@ -1,20 +1,33 @@
-import React, { useState } from 'react';
-import { Student, ContraturnoSegment } from '../types';
-import { Printer, Calendar, ListFilter, Users, CheckSquare, Sparkles } from 'lucide-react';
-import { motion } from 'motion/react';
+import React, { useState, useMemo } from 'react';
+import { Student, ContraturnoSegment, Enrollment, RegularClass } from '../types';
+import { Printer, CheckSquare, Search, Filter, ArrowUpDown, RotateCcw, X } from 'lucide-react';
+import { normalizeClassId, REGULAR_CLASSES } from '../data';
 
 interface ContraturnoScheduleProps {
   students: Student[];
   contraturnos: ContraturnoSegment[];
+  enrollments?: Enrollment[];
+  classPrices?: RegularClass[];
 }
 
 type WeekDay = 'Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex';
 
-export default function ContraturnoSchedule({ students, contraturnos }: ContraturnoScheduleProps) {
+export default function ContraturnoSchedule({ 
+  students, 
+  contraturnos,
+  enrollments = [],
+  classPrices = []
+}: ContraturnoScheduleProps) {
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
 
-  const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
+  // Filters state for Matriz Geral
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [filterNatureza, setFilterNatureza] = useState<string>('todas');
+  const [filterTurma, setFilterTurma] = useState<string>('todas');
+  const [filterDia, setFilterDia] = useState<string>('todos');
+  const [filterPeriodo, setFilterPeriodo] = useState<string>('todos');
+  const [sortBy, setSortBy] = useState<'nome_asc' | 'nome_desc' | 'natureza' | 'turma' | 'valor'>('nome_asc');
 
   const daysOfWeek: WeekDay[] = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
   const dayNamesFull: Record<WeekDay, string> = {
@@ -25,24 +38,130 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
     Sex: 'Sexta-feira'
   };
 
+  // 1) Deduplicate active contraturnos so each student appears at most ONCE
+  const activeContraturnos = useMemo(() => {
+    const map = new Map<string, ContraturnoSegment>();
+    contraturnos.forEach(c => {
+      if (c.dataFim === null) {
+        map.set(c.alunoId, c);
+      }
+    });
+    return Array.from(map.values());
+  }, [contraturnos]);
+
   // Helper to find student details
   const getStudentInfo = (alunoId: string) => students.find(s => s.id === alunoId);
+
+  // Helper to find student regular class name
+  const getStudentRegularClass = (alunoId: string) => {
+    const enr = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026) || enrollments.find(e => e.alunoId === alunoId);
+    if (!enr) return 'Sem Matrícula';
+    if (enr.turmaRegularId === 'sem_regular') return 'Somente Contraturno';
+    const cls = (classPrices.length > 0 ? classPrices : REGULAR_CLASSES).find(
+      c => normalizeClassId(c.id) === normalizeClassId(enr.turmaRegularId)
+    );
+    return cls ? cls.nome : 'Outra';
+  };
 
   // Horário de saída real: Parcial = até 15h, Completo = até 17h30
   const horarioSaida = (periodo: 'Parcial' | 'Completo') => periodo === 'Parcial' ? 'Saída 15h' : 'Saída 17h30';
 
-  // Group active contraturnos by day of week
+  // Group active contraturnos by day of week, deduplicated and sorted A-Z by student name
   const getAttendeesForDay = (day: WeekDay) => {
-    return activeContraturnos
+    const seenStudentIds = new Set<string>();
+    const list = activeContraturnos
       .filter(c => c.diasSemana.includes(day))
       .map(c => {
         const student = getStudentInfo(c.alunoId);
-        return {
-          segment: c,
-          student
-        };
+        return { segment: c, student };
       })
-      .filter(item => item.student !== undefined);
+      .filter((item): item is { segment: ContraturnoSegment; student: Student } => {
+        if (!item.student || seenStudentIds.has(item.student.id)) return false;
+        seenStudentIds.add(item.student.id);
+        return true;
+      });
+
+    return list.sort((a, b) => a.student.nome.localeCompare(b.student.nome, 'pt-BR'));
+  };
+
+  // Unique list of available regular classes for filtering
+  const availableTurmas = useMemo(() => {
+    const set = new Set<string>();
+    activeContraturnos.forEach(c => {
+      const regClass = getStudentRegularClass(c.alunoId);
+      if (regClass) set.add(regClass);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [activeContraturnos, enrollments, classPrices]);
+
+  // Filtered and sorted list for Matriz Geral
+  const filteredAndSortedMatrix = useMemo(() => {
+    return activeContraturnos
+      .map(c => {
+        const student = getStudentInfo(c.alunoId);
+        const regularClass = getStudentRegularClass(c.alunoId);
+        return { segment: c, student, regularClass };
+      })
+      .filter((item): item is { segment: ContraturnoSegment; student: Student; regularClass: string } => {
+        if (!item.student) return false;
+
+        // Search term
+        if (searchTerm.trim() !== '') {
+          const term = searchTerm.toLowerCase();
+          if (!item.student.nome.toLowerCase().includes(term)) return false;
+        }
+
+        // Natureza
+        if (filterNatureza !== 'todas' && item.segment.natureza !== filterNatureza) {
+          return false;
+        }
+
+        // Turma
+        if (filterTurma !== 'todas' && item.regularClass !== filterTurma) {
+          return false;
+        }
+
+        // Dia de semana
+        if (filterDia !== 'todos' && !item.segment.diasSemana.includes(filterDia as WeekDay)) {
+          return false;
+        }
+
+        // Período / Saída
+        if (filterPeriodo !== 'todos' && item.segment.periodo !== filterPeriodo) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'nome_asc') {
+          return a.student.nome.localeCompare(b.student.nome, 'pt-BR');
+        }
+        if (sortBy === 'nome_desc') {
+          return b.student.nome.localeCompare(a.student.nome, 'pt-BR');
+        }
+        if (sortBy === 'natureza') {
+          return a.segment.natureza.localeCompare(b.segment.natureza);
+        }
+        if (sortBy === 'turma') {
+          return a.regularClass.localeCompare(b.regularClass, 'pt-BR');
+        }
+        if (sortBy === 'valor') {
+          return b.segment.valorMensal - a.segment.valorMensal;
+        }
+        return 0;
+      });
+  }, [activeContraturnos, students, enrollments, classPrices, searchTerm, filterNatureza, filterTurma, filterDia, filterPeriodo, sortBy]);
+
+  const hasActiveFilters = searchTerm !== '' || filterNatureza !== 'todas' || filterTurma !== 'todas' || filterDia !== 'todos' || filterPeriodo !== 'todos' || sortBy !== 'nome_asc';
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilterNatureza('todas');
+    setFilterTurma('todas');
+    setFilterDia('todos');
+    setFilterPeriodo('todos');
+    setSortBy('nome_asc');
   };
 
   // Print schedule helper
@@ -84,7 +203,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Melaço</h4>
                       {melaco.map(a => (
                         <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
-                          <span className="font-medium">• {a.student?.nome.split(' ')[0]}</span>
+                          <span className="font-medium">• {a.student?.nome}</span>
                           <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
                         </div>
                       ))}
@@ -96,7 +215,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                       <h4 className="text-[9px] font-bold uppercase border-b border-dashed border-slate-300">Marmelada</h4>
                       {marmelada.map(a => (
                         <div key={a.segment.id} className="text-[9px] flex justify-between gap-1">
-                          <span className="font-medium">• {a.student?.nome.split(' ')[0]}</span>
+                          <span className="font-medium">• {a.student?.nome}</span>
                           <span className="font-mono text-slate-500">{horarioSaida(a.segment.periodo)}</span>
                         </div>
                       ))}
@@ -110,12 +229,13 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
         ) : (
           /* MONTHLY MATRIX PRINT */
           <div className="space-y-3">
-            <h2 className="text-sm font-bold uppercase tracking-wider">Grade Geral do Contraturno</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wider">Matriz Geral do Contraturno</h2>
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left border border-slate-300 border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold font-mono">
                     <th className="p-2 border-r border-slate-300">Estudante</th>
+                    <th className="p-2 border-r border-slate-300">Turma Regular</th>
                     <th className="p-2 border-r border-slate-300">Grupo</th>
                     <th className="p-2 border-r border-slate-300 text-center">Seg</th>
                     <th className="p-2 border-r border-slate-300 text-center">Ter</th>
@@ -126,12 +246,11 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300 text-[10px]">
-                  {activeContraturnos.map(c => {
-                    const student = getStudentInfo(c.alunoId);
-                    if (!student) return null;
+                  {filteredAndSortedMatrix.map(({ segment: c, student, regularClass }) => {
                     return (
                       <tr key={c.id}>
                         <td className="p-2 border-r border-slate-300 font-semibold">{student.nome}</td>
+                        <td className="p-2 border-r border-slate-300 text-slate-600">{regularClass}</td>
                         <td className="p-2 border-r border-slate-300">{c.natureza}</td>
                         {daysOfWeek.map(day => (
                           <td key={day} className="p-2 border-r border-slate-300 text-center font-mono">
@@ -172,17 +291,19 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
           {/* View switcher */}
           <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200 shrink-0">
             <button
+              type="button"
               onClick={() => setViewMode('semanal')}
-              className={`px-2 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
-                viewMode === 'semanal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+              className={`px-2.5 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                viewMode === 'semanal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Semanal (Diário)
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('mensal')}
-              className={`px-2 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
-                viewMode === 'mensal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+              className={`px-2.5 py-1 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                viewMode === 'mensal' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Matriz Geral
@@ -191,6 +312,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
 
           {/* Print button */}
           <button
+            type="button"
             onClick={handlePrint}
             className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-bold rounded-md transition-colors flex items-center gap-1 cursor-pointer"
             title="Imprimir Escala do Contraturno"
@@ -225,7 +347,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                 <div className="p-3 space-y-4 flex-1 divide-y divide-slate-150">
                   {/* Melaço block (under 4) */}
                   <div className="space-y-1.5">
-                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-105 px-2 py-0.5 rounded">
+                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
                       <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
                       Melaço (Até 4) ({melaco.length})
                     </span>
@@ -246,7 +368,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
 
                   {/* Marmelada block (5+) */}
                   <div className="space-y-1.5 pt-3">
-                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-105 px-2 py-0.5 rounded">
+                    <span className="text-[9px] uppercase font-bold text-slate-700 tracking-wider flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                       Marmelada (5+) ({marmelada.length})
                     </span>
@@ -270,22 +392,135 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
           })}
         </div>
       ) : (
-        /* GENERAL MATRIX / CHECKLIST VIEW */
+        /* GENERAL MATRIX / CHECKLIST VIEW WITH ADVANCED FILTERS */
         <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden" id="matrix-checklist-view">
-          <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-            <h3 className="font-sans font-bold text-slate-800 text-xs flex items-center gap-1.5 uppercase tracking-wider">
-              <CheckSquare size={14} className="text-orange-500" />
-              Matriz Geral de Presenças do Contraturno
-            </h3>
-            <span className="text-[10px] text-slate-500 font-mono">Frequências periódicas recorrentes</span>
+          {/* Header */}
+          <div className="p-3 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h3 className="font-sans font-bold text-slate-800 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                <CheckSquare size={14} className="text-orange-500" />
+                Matriz Geral de Presenças do Contraturno
+              </h3>
+              <p className="text-[10px] text-slate-500">Grade completa de presenças, turmas e opções de filtragem</p>
+            </div>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 self-start sm:self-auto">
+              Exibindo {filteredAndSortedMatrix.length} de {activeContraturnos.length} alunos
+            </span>
           </div>
 
+          {/* FILTER TOOLBAR */}
+          <div className="p-3 bg-slate-100/70 border-b border-slate-200 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+              {/* Search by name */}
+              <div className="relative lg:col-span-2">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar aluno por nome..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-slate-800"
+                />
+                {searchTerm && (
+                  <button 
+                    type="button" 
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter by Turma Regular */}
+              <div>
+                <select
+                  value={filterTurma}
+                  onChange={(e) => setFilterTurma(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-slate-800 font-medium"
+                >
+                  <option value="todas">Todas as Turmas Regulares</option>
+                  {availableTurmas.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter by Contraturno Natureza */}
+              <div>
+                <select
+                  value={filterNatureza}
+                  onChange={(e) => setFilterNatureza(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-slate-800 font-medium"
+                >
+                  <option value="todas">Todos os Grupos</option>
+                  <option value="Melaço">Melaço (Até 4)</option>
+                  <option value="Marmelada">Marmelada (5+)</option>
+                </select>
+              </div>
+
+              {/* Filter by Day */}
+              <div>
+                <select
+                  value={filterDia}
+                  onChange={(e) => setFilterDia(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-slate-800 font-medium"
+                >
+                  <option value="todos">Todos os Dias</option>
+                  <option value="Seg">Segunda-feira</option>
+                  <option value="Ter">Terça-feira</option>
+                  <option value="Qua">Quarta-feira</option>
+                  <option value="Qui">Quinta-feira</option>
+                  <option value="Sex">Sexta-feira</option>
+                </select>
+              </div>
+
+              {/* Sort selector */}
+              <div>
+                <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-2 py-1">
+                  <ArrowUpDown size={12} className="text-slate-400 shrink-0" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="w-full bg-transparent text-xs text-slate-800 font-medium focus:outline-none cursor-pointer"
+                  >
+                    <option value="nome_asc">Nome (A - Z)</option>
+                    <option value="nome_desc">Nome (Z - A)</option>
+                    <option value="turma">Por Turma Regular</option>
+                    <option value="natureza">Por Grupo Contraturno</option>
+                    <option value="valor">Por Valor Mensal</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Clear filters trigger if active */}
+            {hasActiveFilters && (
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                  <Filter size={11} className="text-orange-500" />
+                  Filtros ativos no momento
+                </span>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-orange-600 hover:text-orange-800 text-[11px] font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <RotateCcw size={11} />
+                  Limpar Filtros
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* TABLE */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="p-3">Estudante</th>
-                  <th className="p-3">Turma/Grupo</th>
+                  <th className="p-3">Turma Regular</th>
+                  <th className="p-3">Grupo Contraturno</th>
                   {daysOfWeek.map(day => (
                     <th key={day} className="p-3 text-center">{day}</th>
                   ))}
@@ -295,16 +530,18 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
-                {activeContraturnos.map((c) => {
-                  const student = getStudentInfo(c.alunoId);
-                  if (!student) return null;
-
+                {filteredAndSortedMatrix.map(({ segment: c, student, regularClass }) => {
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-3 font-bold text-slate-800">{student.nome}</td>
+                      <td className="p-3 font-semibold text-slate-600">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 text-[11px]">
+                          {regularClass}
+                        </span>
+                      </td>
                       <td className="p-3">
                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                          c.natureza === 'Melaço' ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'
+                          c.natureza === 'Melaço' ? 'bg-orange-100 text-orange-800 border border-orange-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                         }`}>
                           {c.natureza}
                         </span>
@@ -321,7 +558,7 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                           </td>
                         );
                       })}
-                      <td className="p-3 text-center font-bold text-slate-500 text-[11px]">{c.diasSemana.length}x / semana</td>
+                      <td className="p-3 text-center font-bold text-slate-500 text-[11px]">{c.diasSemana.length}x / sem</td>
                       <td className="p-3 text-center">
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                           {horarioSaida(c.periodo)}
@@ -333,10 +570,21 @@ export default function ContraturnoSchedule({ students, contraturnos }: Contratu
                     </tr>
                   );
                 })}
-                {activeContraturnos.length === 0 && (
+
+                {filteredAndSortedMatrix.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-slate-400 font-semibold">
-                      Nenhum contraturno ativo no momento para preencher a matriz.
+                    <td colSpan={11} className="text-center py-10 text-slate-400 space-y-2">
+                      <p className="font-semibold text-sm">Nenhum aluno encontrado com os filtros selecionados.</p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={resetFilters}
+                          className="px-3 py-1 bg-orange-500 text-white rounded text-xs font-bold hover:bg-orange-600 transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <RotateCcw size={12} />
+                          Limpar Filtros
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )}
