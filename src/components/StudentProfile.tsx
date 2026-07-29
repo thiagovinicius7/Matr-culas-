@@ -954,6 +954,14 @@ export default function StudentProfile({
                       const regularClass = isOnlyContraturno 
                         ? null 
                         : (classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)) || suggestedClass);
+                      const activeCont = activeContraturnos.find(c => c.dataFim === null);
+                      const contraturnoVal = activeCont ? activeCont.valorMensal : 0;
+                      const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
+                      const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
+                      const totalBase = e.valorFinalRegular + contraturnoVal + lancheVal + almocoVal;
+                      const pontualidadeDiscountVal = e.descontoPontualidade ? Number((totalBase * 0.03).toFixed(2)) : 0;
+                      const finalNetValue = totalBase - pontualidadeDiscountVal;
+
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
                           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
@@ -1023,14 +1031,24 @@ export default function StudentProfile({
                           </div>
 
                           <div className="space-y-1">
-                            <div className="flex justify-between text-xs text-slate-500">
-                              <span>Valor Mensal Base:</span>
-                              <span className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorRegularOriginal)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-rose-600">
-                              <span>Desconto Negociado:</span>
-                              <span className="font-mono">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.descontoMensal)}</span>
-                            </div>
+                            {!isOnlyContraturno && (
+                              <>
+                                <div className="flex justify-between text-xs text-slate-500">
+                                  <span>Valor Mensal Regular Base:</span>
+                                  <span className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorRegularOriginal)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-rose-600">
+                                  <span>Desconto Ensino Regular:</span>
+                                  <span className="font-mono">-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.descontoMensal)}</span>
+                                </div>
+                              </>
+                            )}
+                            {activeCont && (
+                              <div className="flex justify-between text-xs text-orange-800 font-medium">
+                                <span>Contraturno Ativo ({activeCont.natureza}):</span>
+                                <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(activeCont.valorMensal)}</span>
+                              </div>
+                            )}
                             {e.adicionarLanche && regularClass?.natureza === 'Fundamental' && (
                               <div className="flex justify-between text-xs text-orange-600 font-medium">
                                 <span>Adicional Lanche (Fundamental):</span>
@@ -1045,21 +1063,16 @@ export default function StudentProfile({
                             )}
                             {e.descontoPontualidade && (
                               <div className="flex justify-between text-xs text-blue-600 font-medium">
-                                <span>Desconto Pontualidade (3%):</span>
+                                <span>Desconto Pontualidade (3% no Total):</span>
                                 <span className="font-mono">
-                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                    Number(((e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) * 0.03).toFixed(2))
-                                  )}
+                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pontualidadeDiscountVal)}
                                 </span>
                               </div>
                             )}
                             <div className="flex justify-between text-xs font-bold text-slate-800 pt-1 border-t border-slate-100">
                               <span>{e.descontoPontualidade ? 'Valor Final Líquido (Até Vencimento):' : 'Valor Final Mensal:'}</span>
                               <span className="font-mono text-slate-900">
-                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                  (e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) -
-                                  (e.descontoPontualidade ? Number(((e.valorFinalRegular + (e.adicionarLanche && regularClass?.natureza === 'Fundamental' ? (e.valorLanche || 0) : 0)) * 0.03).toFixed(2)) : 0)
-                                )}
+                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalNetValue)}
                               </span>
                             </div>
                           </div>

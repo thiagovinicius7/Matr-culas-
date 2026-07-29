@@ -114,21 +114,23 @@ export default function Dashboard({
       return sum + e.valorFinalRegular + lancheVal + almocoVal;
     }, 0);
 
-  // 2) Regular revenue WITH prompt payment discount applied (Com Desconto de Pontualidade de 3%)
-  const regularRevenueWithDiscount = enrollments
+  // Totals combining Regular + Contraturnos
+  const totalRevenueWithoutDiscount = regularRevenueGross + contraturnoRevenue;
+
+  // 2) Total revenue WITH prompt payment discount applied (Com Desconto de Pontualidade de 3% no total)
+  const totalRevenueWithDiscount = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
-      const subtotal = e.valorFinalRegular + lancheVal + almocoVal;
-      const discountVal = e.descontoPontualidade ? Number((subtotal * 0.03).toFixed(2)) : 0;
-      return sum + (subtotal - discountVal);
-    }, 0);
+      const activeCont = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
+      const contraturnoVal = activeCont ? activeCont.valorMensal : 0;
 
-  // Totals combining Regular + Contraturnos
-  const totalRevenueWithoutDiscount = regularRevenueGross + contraturnoRevenue;
-  const totalRevenueWithDiscount = regularRevenueWithDiscount + contraturnoRevenue;
+      const subtotalStudent = e.valorFinalRegular + lancheVal + almocoVal + contraturnoVal;
+      const discountVal = e.descontoPontualidade ? Number((subtotalStudent * 0.03).toFixed(2)) : 0;
+      return sum + (subtotalStudent - discountVal);
+    }, 0) + contraturnos.filter(c => c.dataFim === null && !enrollments.some(e => e.alunoId === c.alunoId && e.statusNegociacao === 'Confirmada')).reduce((sum, c) => sum + c.valorMensal, 0);
 
   // Distribution by Class
   const classDistribution = REGULAR_CLASSES.map(cls => {

@@ -422,12 +422,12 @@ export default function NegotiationCalc({
                       className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer"
                     />
                     <label htmlFor="desconto-pontualidade" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
-                      Desconto de Pontualidade (3% se pago até o vencimento)
+                      Desconto de Pontualidade (3% se pago até o vencimento — incide sobre Ensino Regular e Contraturno)
                     </label>
                   </div>
                   {descontoPontualidade && (
                     <span className="text-[10px] bg-blue-100 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded-full uppercase">
-                      Ativo (3% Off)
+                      Ativo (3% Off no Total)
                     </span>
                   )}
                 </div>
