@@ -72,13 +72,33 @@ export default function RematriculaList({
     const almocoPrice = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
     const totalNegotiatedMonthly = e.valorFinalRegular + (activeCont ? activeCont.valorMensal : 0) + lanchePrice + almocoPrice;
 
+    const isOnlyCont = e.turmaRegularId === 'sem_regular';
+    const regSubtotal = !isOnlyCont ? (e.valorFinalRegular + lanchePrice) : 0;
+    const contSubtotal = activeCont ? activeCont.valorMensal : 0;
+
+    const hasRegPont = e.descontoPontualidadeRegular !== undefined 
+      ? e.descontoPontualidadeRegular 
+      : (e.descontoPontualidade ?? false);
+    const hasContPont = e.descontoPontualidadeContraturno !== undefined 
+      ? e.descontoPontualidadeContraturno 
+      : false;
+
+    const discRegPont = (hasRegPont && !isOnlyCont) ? Number((regSubtotal * 0.03).toFixed(2)) : 0;
+    const discContPont = (hasContPont && activeCont) ? Number((contSubtotal * 0.03).toFixed(2)) : 0;
+    const totalPontDiscount = discRegPont + discContPont;
+
     return {
       enrollment: e,
       student,
       guardian: financialGuardian,
       regularClass,
       activeContraturno: activeCont,
-      totalNegotiatedMonthly
+      totalNegotiatedMonthly,
+      hasRegPont,
+      hasContPont,
+      discRegPont,
+      discContPont,
+      totalPontDiscount
     };
   });
 
@@ -208,7 +228,7 @@ export default function RematriculaList({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
-              {filteredData.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly }) => {
+              {filteredData.map(({ enrollment, student, guardian, regularClass, activeContraturno, totalNegotiatedMonthly, hasRegPont, hasContPont, discRegPont, discContPont, totalPontDiscount }) => {
                 if (!student) return null;
                 const isEditingThisNotes = editingNotesStudentId === student.id;
 
@@ -231,9 +251,9 @@ export default function RematriculaList({
                               + Contraturno ({activeContraturno.natureza})
                             </span>
                           )}
-                          {enrollment.descontoPontualidade && (
+                          {(hasRegPont || hasContPont) && (
                             <span className="text-[9px] bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.2 rounded font-semibold">
-                              3% Pontualidade
+                              3% Pontualidade ({hasRegPont && hasContPont ? 'Geral' : (hasRegPont ? 'Regular' : 'Contraturno')})
                             </span>
                           )}
                         </div>
@@ -352,18 +372,24 @@ export default function RematriculaList({
                               <span>+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(enrollment.valorAlmoco || 0)}</span>
                             </div>
                           )}
-                          {enrollment.descontoPontualidade && (
+                          {discRegPont > 0 && (
                             <div className="flex justify-between max-w-[150px] text-[10px] text-blue-500 font-medium">
-                              <span>Pontualidade (3%):</span>
-                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number((totalNegotiatedMonthly * 0.03).toFixed(2)))}</span>
+                              <span>Pontual. Regular (3%):</span>
+                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discRegPont)}</span>
+                            </div>
+                          )}
+                          {discContPont > 0 && (
+                            <div className="flex justify-between max-w-[150px] text-[10px] text-blue-500 font-medium">
+                              <span>Pontual. Contraturno (3%):</span>
+                              <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discContPont)}</span>
                             </div>
                           )}
                           <div className="flex justify-between items-center max-w-[150px] font-bold text-slate-900 text-xs">
-                            <span>{enrollment.descontoPontualidade ? 'Líquido Pontual:' : 'Total Mensal:'}</span>
+                            <span>{totalPontDiscount > 0 ? 'Líquido Pontual:' : 'Total Mensal:'}</span>
                             <div className="flex items-center gap-1">
                               <span className="font-mono text-slate-900">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                  totalNegotiatedMonthly - (enrollment.descontoPontualidade ? Number((totalNegotiatedMonthly * 0.03).toFixed(2)) : 0)
+                                  totalNegotiatedMonthly - totalPontDiscount
                                 )}
                               </span>
                               <button

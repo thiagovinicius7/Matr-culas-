@@ -958,9 +958,24 @@ export default function StudentProfile({
                       const contraturnoVal = activeCont ? activeCont.valorMensal : 0;
                       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
                       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
-                      const totalBase = e.valorFinalRegular + contraturnoVal + lancheVal + almocoVal;
-                      const pontualidadeDiscountVal = e.descontoPontualidade ? Number((totalBase * 0.03).toFixed(2)) : 0;
-                      const finalNetValue = totalBase - pontualidadeDiscountVal;
+
+                      const regularSubtotal = !isOnlyContraturno ? (e.valorFinalRegular + lancheVal) : 0;
+                      const contraturnoSubtotal = contraturnoVal;
+                      const almocoSubtotal = almocoVal;
+
+                      const hasRegPont = e.descontoPontualidadeRegular !== undefined 
+                        ? e.descontoPontualidadeRegular 
+                        : (e.descontoPontualidade ?? false);
+                      const hasContPont = e.descontoPontualidadeContraturno !== undefined 
+                        ? e.descontoPontualidadeContraturno 
+                        : false;
+
+                      const pontualidadeRegVal = (hasRegPont && !isOnlyContraturno) ? Number((regularSubtotal * 0.03).toFixed(2)) : 0;
+                      const pontualidadeContVal = (hasContPont && activeCont) ? Number((contraturnoSubtotal * 0.03).toFixed(2)) : 0;
+                      const totalPontualidadeDisc = pontualidadeRegVal + pontualidadeContVal;
+
+                      const totalBase = regularSubtotal + contraturnoSubtotal + almocoSubtotal;
+                      const finalNetValue = totalBase - totalPontualidadeDisc;
 
                       return (
                         <div key={e.id} className="space-y-3" id="enrollment-summary">
@@ -1061,16 +1076,24 @@ export default function StudentProfile({
                                 <span className="font-mono">+{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(e.valorAlmoco || 0)}</span>
                               </div>
                             )}
-                            {e.descontoPontualidade && (
+                            {pontualidadeRegVal > 0 && (
                               <div className="flex justify-between text-xs text-blue-600 font-medium">
-                                <span>Desconto Pontualidade (3% no Total):</span>
+                                <span>Pontualidade Ensino Regular (3%):</span>
                                 <span className="font-mono">
-                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pontualidadeDiscountVal)}
+                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pontualidadeRegVal)}
+                                </span>
+                              </div>
+                            )}
+                            {pontualidadeContVal > 0 && (
+                              <div className="flex justify-between text-xs text-blue-600 font-medium">
+                                <span>Pontualidade Contraturno (3%):</span>
+                                <span className="font-mono">
+                                  -{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pontualidadeContVal)}
                                 </span>
                               </div>
                             )}
                             <div className="flex justify-between text-xs font-bold text-slate-800 pt-1 border-t border-slate-100">
-                              <span>{e.descontoPontualidade ? 'Valor Final Líquido (Até Vencimento):' : 'Valor Final Mensal:'}</span>
+                              <span>{totalPontualidadeDisc > 0 ? 'Valor Final Líquido (Até Vencimento):' : 'Valor Final Mensal:'}</span>
                               <span className="font-mono text-slate-900">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalNetValue)}
                               </span>

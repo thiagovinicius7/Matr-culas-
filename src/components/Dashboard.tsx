@@ -117,19 +117,33 @@ export default function Dashboard({
   // Totals combining Regular + Contraturnos
   const totalRevenueWithoutDiscount = regularRevenueGross + contraturnoRevenue;
 
-  // 2) Total revenue WITH prompt payment discount applied (Com Desconto de Pontualidade de 3% no total)
+  // 2) Total revenue WITH prompt payment discount applied
   const totalRevenueWithDiscount = enrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
       const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
+      const isOnlyContraturno = e.turmaRegularId === 'sem_regular';
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
       const activeCont = contraturnos.find(c => c.alunoId === e.alunoId && c.dataFim === null);
       const contraturnoVal = activeCont ? activeCont.valorMensal : 0;
 
-      const subtotalStudent = e.valorFinalRegular + lancheVal + almocoVal + contraturnoVal;
-      const discountVal = e.descontoPontualidade ? Number((subtotalStudent * 0.03).toFixed(2)) : 0;
-      return sum + (subtotalStudent - discountVal);
+      const regularSubtotal = !isOnlyContraturno ? (e.valorFinalRegular + lancheVal) : 0;
+      const contraturnoSubtotal = contraturnoVal;
+      const almocoSubtotal = almocoVal;
+
+      const hasRegPont = e.descontoPontualidadeRegular !== undefined 
+        ? e.descontoPontualidadeRegular 
+        : (e.descontoPontualidade ?? false);
+      const hasContPont = e.descontoPontualidadeContraturno !== undefined 
+        ? e.descontoPontualidadeContraturno 
+        : false;
+
+      const discReg = (hasRegPont && !isOnlyContraturno) ? Number((regularSubtotal * 0.03).toFixed(2)) : 0;
+      const discCont = (hasContPont && activeCont) ? Number((contraturnoSubtotal * 0.03).toFixed(2)) : 0;
+
+      const studentNetTotal = (regularSubtotal + contraturnoSubtotal + almocoSubtotal) - (discReg + discCont);
+      return sum + studentNetTotal;
     }, 0) + contraturnos.filter(c => c.dataFim === null && !enrollments.some(e => e.alunoId === c.alunoId && e.statusNegociacao === 'Confirmada')).reduce((sum, c) => sum + c.valorMensal, 0);
 
   // Distribution by Class

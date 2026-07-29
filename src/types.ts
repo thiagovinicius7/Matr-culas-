@@ -58,7 +58,9 @@ export interface Enrollment {
   valorLanche?: number;
   adicionarAlmoco?: boolean;
   valorAlmoco?: number;
-  descontoPontualidade?: boolean;
+  descontoPontualidade?: boolean; // legacy or backward compatibility alias
+  descontoPontualidadeRegular?: boolean;
+  descontoPontualidadeContraturno?: boolean;
 }
 
 export interface FinancialMovement {
