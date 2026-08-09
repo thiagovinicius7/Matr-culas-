@@ -237,7 +237,19 @@ export default function RematriculaList({
                     {/* Student Column */}
                     <td className="p-3">
                       <div className="space-y-0.5">
-                        <span className="font-bold text-slate-800 text-xs block">{student.nome}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-800 text-xs">{student.nome}</span>
+                          {student.status === 'trancado' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 uppercase">
+                              Trancado
+                            </span>
+                          )}
+                          {student.status === 'cancelado' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-300 uppercase">
+                              Cancelado
+                            </span>
+                          )}
+                        </div>
                         <div className="flex gap-1.5 items-center">
                           <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold border ${
                             enrollment.turmaRegularId === 'sem_regular'

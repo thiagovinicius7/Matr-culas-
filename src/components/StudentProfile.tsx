@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId } from '../data';
-import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator } from 'lucide-react';
+import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
 
@@ -48,6 +48,7 @@ export default function StudentProfile({
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ativo' | 'trancado' | 'cancelado' | 'todos'>('ativo');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   // Controla se o painel de detalhes aparece como overlay em telas pequenas
@@ -64,7 +65,7 @@ export default function StudentProfile({
   const [formNome, setFormNome] = useState('');
   const [formNascimento, setFormNascimento] = useState('');
   const [formObservacoes, setFormObservacoes] = useState('');
-  const [formStatus, setFormStatus] = useState<'ativo' | 'inativo'>('ativo');
+  const [formStatus, setFormStatus] = useState<'ativo' | 'trancado' | 'cancelado' | 'inativo'>('ativo');
   const [formSomenteContraturno, setFormSomenteContraturno] = useState(false);
   
   // Guardians list during student creation
@@ -171,10 +172,21 @@ export default function StudentProfile({
   const currentAge = activeStudent ? calculateAgeAtCutoff(activeStudent.nascimento, 2026) : 0;
   const suggestedClass = activeStudent ? getRegularClassForAge(currentAge) : null;
 
+  // Status counts
+  const activeCount = students.filter(s => s.status === 'ativo').length;
+  const trancadoCount = students.filter(s => s.status === 'trancado').length;
+  const canceladoCount = students.filter(s => s.status === 'cancelado').length;
+
   // Filter student list
-  const filteredStudents = students.filter(student =>
-    student.nome.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = student.nome.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (statusFilter === 'ativo') return student.status === 'ativo';
+    if (statusFilter === 'trancado') return student.status === 'trancado';
+    if (statusFilter === 'cancelado') return student.status === 'cancelado';
+    return true; // 'todos'
+  });
 
   const startAddStudent = () => {
     setFormNome('');
@@ -300,7 +312,7 @@ export default function StudentProfile({
           </button>
         </div>
 
-        <div className="relative">
+        <div className="relative space-y-2">
           <input
             type="text"
             placeholder="Buscar por nome do aluno..."
@@ -308,6 +320,45 @@ export default function StudentProfile({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-slate-50/50"
           />
+
+          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg text-[10px] font-bold">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ativo')}
+              className={`py-1 rounded-md transition-all text-center cursor-pointer ${
+                statusFilter === 'ativo' ? 'bg-white text-emerald-800 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Ativos ({activeCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('trancado')}
+              className={`py-1 rounded-md transition-all text-center cursor-pointer ${
+                statusFilter === 'trancado' ? 'bg-white text-amber-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Trancados ({trancadoCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('cancelado')}
+              className={`py-1 rounded-md transition-all text-center cursor-pointer ${
+                statusFilter === 'cancelado' ? 'bg-white text-rose-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Cancelados ({canceladoCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('todos')}
+              className={`py-1 rounded-md transition-all text-center cursor-pointer ${
+                statusFilter === 'todos' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
 
         <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
@@ -337,8 +388,14 @@ export default function StudentProfile({
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                    st.status === 'ativo' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                    st.status === 'ativo' 
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                      : st.status === 'trancado' 
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                      : st.status === 'cancelado' 
+                      ? 'bg-rose-100 text-rose-900 border border-rose-300' 
+                      : 'bg-slate-100 text-slate-600'
                   }`}>
                     {st.status}
                   </span>
@@ -605,9 +662,11 @@ export default function StudentProfile({
                     <select
                       value={formStatus}
                       onChange={(e) => setFormStatus(e.target.value as any)}
-                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white"
+                      className="w-full text-xs px-3 py-1.5 rounded-md border border-slate-200 focus:border-slate-500 focus:outline-none bg-white font-medium"
                     >
-                      <option value="ativo">Ativo</option>
+                      <option value="ativo">Ativo (Matriculado)</option>
+                      <option value="trancado">Trancado (Matrícula Trancada)</option>
+                      <option value="cancelado">Cancelado (Matrícula Cancelada)</option>
                       <option value="inativo">Inativo</option>
                     </select>
                   </div>
@@ -685,6 +744,48 @@ export default function StudentProfile({
                   </button>
                 </div>
 
+                {activeStudent.status === 'trancado' && (
+                  <div className="mb-4 bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-md flex items-center justify-between gap-3 text-amber-900 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <Lock size={16} className="text-amber-600 shrink-0" />
+                      <div>
+                        <strong className="font-bold block text-amber-900">Matrícula Trancada</strong>
+                        <p className="text-[11px] text-amber-800">O aluno não aparece nas chamadas diárias, mas todo o seu histórico permanece gravado.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onUpdateStudent({ ...activeStudent, status: 'ativo' });
+                      }}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs shrink-0 cursor-pointer shadow-2xs flex items-center gap-1"
+                    >
+                      <RefreshCw size={12} />
+                      Reativar Matrícula
+                    </button>
+                  </div>
+                )}
+
+                {activeStudent.status === 'cancelado' && (
+                  <div className="mb-4 bg-rose-50 border-l-4 border-rose-500 p-3 rounded-r-md flex items-center justify-between gap-3 text-rose-900 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <Ban size={16} className="text-rose-600 shrink-0" />
+                      <div>
+                        <strong className="font-bold block text-rose-900">Matrícula Cancelada</strong>
+                        <p className="text-[11px] text-rose-800">Cadastro arquivado. Você pode reativá-lo a qualquer momento para restaurar o aluno.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onUpdateStudent({ ...activeStudent, status: 'ativo' });
+                      }}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-xs shrink-0 cursor-pointer shadow-2xs flex items-center gap-1"
+                    >
+                      <RefreshCw size={12} />
+                      Reativar Matrícula
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-md bg-emerald-50 text-emerald-800 flex items-center justify-center font-bold text-lg uppercase shadow-xs border border-emerald-200">
                     {activeStudent.nome.charAt(0)}
@@ -693,9 +794,15 @@ export default function StudentProfile({
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-bold text-slate-900">{activeStudent.nome}</h3>
                       <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        activeStudent.status === 'ativo' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                        activeStudent.status === 'ativo' 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                          : activeStudent.status === 'trancado' 
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                          : activeStudent.status === 'cancelado' 
+                          ? 'bg-rose-100 text-rose-900 border border-rose-300' 
+                          : 'bg-slate-100 text-slate-600'
                       }`}>
-                        {activeStudent.status}
+                        {activeStudent.status === 'ativo' ? 'Ativo' : activeStudent.status === 'trancado' ? 'Trancado' : activeStudent.status === 'cancelado' ? 'Cancelado' : activeStudent.status}
                       </span>
                     </div>
 
@@ -720,6 +827,47 @@ export default function StudentProfile({
                     <Calculator size={13} />
                     Ir para Calculadora de Acordo
                   </button>
+
+                  {activeStudent.status === 'ativo' ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Deseja trancar a matrícula de ${activeStudent.nome}? Ele deixará de constar nas listas de chamada ativas.`)) {
+                            onUpdateStudent({ ...activeStudent, status: 'trancado' });
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-amber-200"
+                        title="Trancar a matrícula mantendo histórico gravado"
+                      >
+                        <Lock size={13} />
+                        Trancar Matrícula
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (confirm(`Deseja cancelar a matrícula de ${activeStudent.nome}?`)) {
+                            onUpdateStudent({ ...activeStudent, status: 'cancelado' });
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-200"
+                        title="Cancelar a matrícula e arquivar aluno"
+                      >
+                        <Ban size={13} />
+                        Cancelar Matrícula
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        onUpdateStudent({ ...activeStudent, status: 'ativo' });
+                      }}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-emerald-300"
+                    >
+                      <CheckCircle size={13} />
+                      Reativar Matrícula (Retornar)
+                    </button>
+                  )}
+
                   <button
                     onClick={handleExportImage}
                     disabled={isExporting}

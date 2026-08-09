@@ -1,10 +1,12 @@
+export type StudentStatus = 'ativo' | 'trancado' | 'cancelado' | 'inativo';
+
 export interface Student {
   id: string;
   nome: string;
   nascimento: string; // YYYY-MM-DD
   dataEntrada: string; // YYYY-MM-DD
   observacoes: string;
-  status: 'ativo' | 'inativo';
+  status: StudentStatus;
 }
 
 export interface Guardian {

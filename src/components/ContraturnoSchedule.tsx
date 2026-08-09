@@ -42,16 +42,19 @@ export default function ContraturnoSchedule({
     Sex: 'Sexta-feira'
   };
 
-  // 1) Deduplicate active contraturnos so each student appears at most ONCE
+  // 1) Deduplicate active contraturnos so each student appears at most ONCE (only active students)
   const activeContraturnos = useMemo(() => {
     const map = new Map<string, ContraturnoSegment>();
     contraturnos.forEach(c => {
       if (c.dataFim === null) {
-        map.set(c.alunoId, c);
+        const student = students.find(s => s.id === c.alunoId);
+        if (student && student.status === 'ativo') {
+          map.set(c.alunoId, c);
+        }
       }
     });
     return Array.from(map.values());
-  }, [contraturnos]);
+  }, [contraturnos, students]);
 
   // Helper to find student details
   const getStudentInfo = (alunoId: string) => students.find(s => s.id === alunoId);
