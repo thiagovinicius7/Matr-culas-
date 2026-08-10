@@ -107,8 +107,12 @@ export default function App() {
           getCollectionData<{ id: string; value: string }>('settings')
         ]);
         
-        // Sort students alphabetically by name
-        const sortedStudents = [...loadedStudents].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        // Ensure student status defaults to 'ativo' if missing, preserving 'trancado', 'cancelado', etc.
+        const sanitizedStudents = (loadedStudents || []).map(st => ({
+          ...st,
+          status: st.status || 'ativo'
+        }));
+        const sortedStudents = [...sanitizedStudents].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
         // Ensure every student has an enrollment record in memory if somehow missing
         const existingEnrollmentMap = new Map(loadedEnrollments.map(e => [e.alunoId, e]));
@@ -489,9 +493,32 @@ export default function App() {
   };
 
   // Handler: Edit basic student details
-  const handleUpdateStudent = (updatedStudent: Student) => {
+  const handleUpdateStudent = async (updatedStudent: Student) => {
     setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
-    saveDocument('students', updatedStudent);
+    await saveDocument('students', updatedStudent);
+
+    // If student status changed to 'cancelado', sync enrollment statusNegociacao to 'Cancelada'
+    if (updatedStudent.status === 'cancelado') {
+      setEnrollments(prev => prev.map(e => {
+        if (e.alunoId === updatedStudent.id) {
+          const updatedE = { ...e, statusNegociacao: 'Cancelada' as const };
+          saveDocument('enrollments', updatedE);
+          return updatedE;
+        }
+        return e;
+      }));
+    } else if (updatedStudent.status === 'ativo') {
+      // If student was reactivated, restore enrollment status from 'Cancelada' to 'Pendente'
+      setEnrollments(prev => prev.map(e => {
+        if (e.alunoId === updatedStudent.id && e.statusNegociacao === 'Cancelada') {
+          const updatedE = { ...e, statusNegociacao: 'Pendente' as const };
+          saveDocument('enrollments', updatedE);
+          return updatedE;
+        }
+        return e;
+      }));
+    }
+
     showToast('Cadastro Atualizado', `As alterações de ${updatedStudent.nome} foram salvas.`, 'success');
 
     // If birthday changed, recalculate regular class and adjust enrollment base price

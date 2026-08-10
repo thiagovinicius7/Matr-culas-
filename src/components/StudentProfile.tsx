@@ -179,8 +179,11 @@ export default function StudentProfile({
 
   // Filter student list
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.nome.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = student.nome.toLowerCase().includes(searchQuery.trim().toLowerCase());
     if (!matchesSearch) return false;
+
+    // If typing a search query, show all matching students regardless of tab filter so they can easily find them
+    if (searchQuery.trim().length > 0) return true;
 
     if (statusFilter === 'ativo') return student.status === 'ativo';
     if (statusFilter === 'trancado') return student.status === 'trancado';

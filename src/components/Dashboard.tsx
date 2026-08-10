@@ -87,9 +87,9 @@ export default function Dashboard({
   const totalStudentsCount = students.length;
   const activeStudentsCount = activeStudents.length;
 
-  // Rematrícula Funnel - Filter to valid students only
-  const validStudentIds = new Set(students.map(s => s.id));
-  const validEnrollments = enrollments.filter(e => validStudentIds.has(e.alunoId));
+  // Rematrícula Funnel - Filter to active students only
+  const activeStudentIds = new Set(activeStudents.map(s => s.id));
+  const validEnrollments = enrollments.filter(e => activeStudentIds.has(e.alunoId));
 
   const totalEnrollments = validEnrollments.length;
   const confirmed = validEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
