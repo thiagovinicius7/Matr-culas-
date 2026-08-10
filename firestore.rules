@@ -24,7 +24,7 @@ service cloud.firestore {
         && data.nascimento is string && data.nascimento.size() == 10
         && data.dataEntrada is string && data.dataEntrada.size() == 10
         && data.observacoes is string && data.observacoes.size() <= 2000
-        && (data.status == 'ativo' || data.status == 'inativo');
+        && (data.status == 'ativo' || data.status == 'trancado' || data.status == 'cancelado' || data.status == 'inativo');
     }
 
     function isValidGuardian(data) {
