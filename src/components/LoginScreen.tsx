@@ -72,8 +72,13 @@ export default function LoginScreen({ expectedPassword, onLoginSuccess }: LoginS
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full blur-2xl pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-brand-green-light/20 rounded-full blur-xl pointer-events-none"></div>
           
-          <div className="mx-auto w-12 h-12 bg-brand-orange text-white rounded-full flex items-center justify-center shadow-md mb-3">
-            <Sprout size={24} className="stroke-[2.5]" />
+          <div className="mx-auto mb-3 flex items-center justify-center p-2 bg-white/95 rounded-xl shadow-md max-w-[180px]">
+            <img 
+              src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png" 
+              alt="Sítio-Escola Geranium" 
+              className="h-12 w-auto object-contain" 
+              referrerPolicy="no-referrer"
+            />
           </div>
           <h1 className="font-display font-bold text-lg tracking-tight">Sítio-Escola Geranium</h1>
           <p className="text-[10px] text-brand-sand mt-1 uppercase tracking-wider font-bold">Gestor de Rematrículas</p>

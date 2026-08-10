@@ -63,6 +63,24 @@ export interface Enrollment {
   descontoPontualidade?: boolean; // legacy or backward compatibility alias
   descontoPontualidadeRegular?: boolean;
   descontoPontualidadeContraturno?: boolean;
+
+  // Novos campos para Carta de Intenção e Rematrícula 2027
+  valorProposto2027?: number; // Valor personalizado editável para a regular de 2027
+  turmaPropostaId2027?: string; // Turma prevista 2027
+  contraturnoDesejado2027?: boolean;
+  diasContraturno2027?: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[];
+  horarioSaida2027?: '15:30' | '17:30';
+  periodoContraturno2027?: 'Parcial' | 'Completo';
+  adicionarLanche2027?: boolean;
+  valorLanche2027?: number;
+  adicionarAlmoco2027?: boolean;
+  valorAlmoco2027?: number;
+  diaVencimento2027?: '01' | '05' | '10' | '15' | '20';
+  descontoPontualidadeAtivo2027?: boolean;
+  valorDescontoPontualidade2027?: number;
+  statusIntencao2027?: 'Pendente' | 'Confirmada' | 'Em Análise' | 'Não Renovará';
+  observacoesFamilia2027?: string;
+  dataIntencao2027?: string;
 }
 
 export interface FinancialMovement {

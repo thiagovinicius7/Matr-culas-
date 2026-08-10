@@ -31,6 +31,7 @@ import RematriculaList from './components/RematriculaList';
 import ContraturnoSchedule from './components/ContraturnoSchedule';
 import PricingSettings from './components/PricingSettings';
 import LoginScreen from './components/LoginScreen';
+import ParentCartaPortal from './components/ParentCartaPortal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { LayoutDashboard, Users, Calculator, ClipboardList, CalendarDays, Sprout, Menu, X, Settings, LogOut, Download, Upload, Database, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -952,6 +953,36 @@ export default function App() {
     showToast('Responsável Salvo', 'Dados do responsável financeiro atualizados no Firebase.', 'success');
   };
 
+  // Handler: Save or update full enrollment record (e.g. Carta de Intenção 2027 data)
+  const handleSaveEnrollment = (updatedEnrollment: Enrollment, logMovement: boolean = false) => {
+    setEnrollments(prev => {
+      const exists = prev.some(e => e.id === updatedEnrollment.id);
+      if (exists) {
+        return prev.map(e => e.id === updatedEnrollment.id ? updatedEnrollment : e);
+      }
+      return [...prev, updatedEnrollment];
+    });
+
+    saveDocument('enrollments', updatedEnrollment);
+
+    if (logMovement) {
+      const student = students.find(s => s.id === updatedEnrollment.alunoId);
+      const movement: FinancialMovement = {
+        id: `mov_carta_${Date.now()}`,
+        alunoId: updatedEnrollment.alunoId,
+        data: new Date().toISOString().split('T')[0],
+        tipo: 'Desconto_Alterado',
+        descricao: `Carta de Intenção 2027 salva para ${student?.nome || 'aluno'}. Valor Proposto: R$ ${updatedEnrollment.valorProposto2027 || 0}/mês.`,
+        valorAnterior: updatedEnrollment.valorFinalRegular,
+        valorNovo: updatedEnrollment.valorProposto2027 || 0
+      };
+      setMovements(prev => [...prev, movement]);
+      saveDocument('movements', movement);
+    }
+
+    showToast('Intenção Salva!', 'A Carta de Intenção de Rematrícula 2027 foi gravada com sucesso no Firebase.', 'success');
+  };
+
   // Handler: Save global pricing configurations
   const handleSavePrices = async (updatedClasses: RegularClass[], updatedContraturno: ContraturnoPrice[], year: number) => {
     // 1. Filter out existing items for this year from our state
@@ -1133,6 +1164,49 @@ export default function App() {
     event.target.value = '';
   };
 
+  // Check if opening via public parent link (e.g. ?alunoId=XYZ or ?carta=XYZ)
+  const urlParams = new URLSearchParams(window.location.search);
+  const publicStudentId = urlParams.get('alunoId') || urlParams.get('carta');
+
+  if (publicStudentId) {
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+          <div className="text-center space-y-3">
+            <div className="w-12 h-12 border-4 border-brand-orange border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <p className="text-sm font-bold text-slate-700 font-display">Carregando Carta de Intenção 2027...</p>
+          </div>
+        </div>
+      );
+    }
+
+    const parentStudent = students.find(s => s.id === publicStudentId);
+    if (parentStudent) {
+      const parentGuardian = guardians.find(g => g.alunoId === parentStudent.id && g.financeiro) || guardians.find(g => g.alunoId === parentStudent.id);
+      const parentEnrollment = enrollments.find(e => e.alunoId === parentStudent.id && e.ano === 2026) || enrollments.find(e => e.alunoId === parentStudent.id);
+      const parentContraturno = contraturnos.find(c => c.alunoId === parentStudent.id && c.dataFim === null);
+
+      return (
+        <ParentCartaPortal
+          student={parentStudent}
+          guardian={parentGuardian}
+          enrollment={parentEnrollment}
+          activeContraturno={parentContraturno}
+          classPrices={classPrices}
+          contraturnoPrices={contraturnoPrices}
+          onSaveResponse={(updatedEnrollment) => handleSaveEnrollment(updatedEnrollment, true)}
+          onBackToAdmin={isLoggedIn ? () => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('alunoId');
+            url.searchParams.delete('carta');
+            window.history.pushState({}, '', url.toString());
+            window.location.reload();
+          } : undefined}
+        />
+      );
+    }
+  }
+
   if (!isLoggedIn) {
     return (
       <LoginScreen 
@@ -1149,9 +1223,14 @@ export default function App() {
     <div className="h-screen bg-brand-cream font-sans text-slate-800 flex overflow-hidden" id="app-viewport">
       {/* Sidebar Navigation - Desktop */}
       <aside className="w-56 h-full bg-brand-green-dark flex flex-col shrink-0 hidden md:flex border-r border-emerald-900/40" id="app-sidebar">
-        <div className="p-5 flex items-center gap-3 border-b border-emerald-900/30">
-          <div className="p-1.5 bg-brand-orange text-white rounded-lg flex items-center justify-center shadow-md">
-            <Sprout size={18} className="stroke-[2.5]" />
+        <div className="p-4 flex items-center gap-3 border-b border-emerald-900/30">
+          <div className="bg-white p-1.5 rounded-lg shrink-0 shadow-xs flex items-center justify-center">
+            <img 
+              src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png" 
+              alt="Sítio Geranium" 
+              className="h-8 w-auto object-contain" 
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
             <h1 className="text-white font-display font-bold text-sm tracking-tight leading-none">Sítio Geranium</h1>
@@ -1223,10 +1302,15 @@ export default function App() {
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile Header / Navigation */}
-        <header className="bg-brand-green-dark text-white px-4 py-3 flex items-center justify-between md:hidden shrink-0" id="mobile-header">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-brand-orange text-white rounded-lg flex items-center justify-center shadow-xs">
-              <Sprout size={16} className="stroke-[2.5]" />
+        <header className="bg-brand-green-dark text-white px-4 py-2.5 flex items-center justify-between md:hidden shrink-0" id="mobile-header">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white p-1 rounded-lg shrink-0 flex items-center justify-center">
+              <img 
+                src="https://sitioescolageranium.com.br/imagens/logo-sitio-escola-geranium.png" 
+                alt="Sítio Geranium" 
+                className="h-7 w-auto object-contain" 
+                referrerPolicy="no-referrer"
+              />
             </div>
             <h1 className="font-display font-bold text-sm tracking-tight">Sítio Geranium</h1>
           </div>
@@ -1377,6 +1461,7 @@ export default function App() {
                   contraturnos={contraturnos} 
                   movements={movements}
                   classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
                   selectedStudentId={selectedStudentId}
                   onSelectStudent={setSelectedStudentId}
                   onNavigateWithStudent={handleNavigateWithStudent}
@@ -1389,6 +1474,7 @@ export default function App() {
                   onUpdateEnrollmentClass={handleUpdateEnrollmentClass}
                   onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
                   onUpdateContraturnoDays={handleUpdateContraturnoDays}
+                  onSaveEnrollment={handleSaveEnrollment}
                 />
               )}
               {activeTab === 'negotiation' && (
@@ -1416,6 +1502,7 @@ export default function App() {
                   onUpdateEnrollmentStatus={handleUpdateEnrollmentStatus}
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
                   onUpdateEnrollmentDiscounts={handleUpdateEnrollmentDiscounts}
+                  onSaveEnrollment={handleSaveEnrollment}
                 />
               )}
               {activeTab === 'escala' && (

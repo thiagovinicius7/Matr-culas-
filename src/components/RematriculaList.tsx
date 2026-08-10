@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId } from '../data';
-import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import CartaIntencaoForm from './CartaIntencaoForm';
 
 interface RematriculaListProps {
   students: Student[];
@@ -15,6 +16,7 @@ interface RematriculaListProps {
   onUpdateEnrollmentStatus: (alunoId: string, status: Enrollment['statusNegociacao']) => void;
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
   onUpdateEnrollmentDiscounts: (alunoId: string, discountRegular: number, discountContraturno: number) => void;
+  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
 }
 
 export default function RematriculaList({
@@ -27,7 +29,8 @@ export default function RematriculaList({
   preselectedStudentId,
   onUpdateEnrollmentStatus,
   onUpdateEnrollmentNotes,
-  onUpdateEnrollmentDiscounts
+  onUpdateEnrollmentDiscounts,
+  onSaveEnrollment
 }: RematriculaListProps) {
   const [filterStatus, setFilterStatus] = useState<'Todas' | 'Pendente' | 'Em Negociação' | 'Confirmada'>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +50,7 @@ export default function RematriculaList({
   }, [preselectedStudentId, students]);
   const [editingNotesStudentId, setEditingNotesStudentId] = useState<string | null>(null);
   const [tempNotesValue, setTempNotesValue] = useState('');
+  const [activeCartaStudentId, setActiveCartaStudentId] = useState<string | null>(null);
 
   // Available enrollment years
   const availableYears = Array.from(new Set([2026, ...enrollments.map(e => e.ano)])).sort((a, b) => a - b);
@@ -486,6 +490,17 @@ export default function RematriculaList({
                             );
                           })}
                         </div>
+
+                        {/* Carta de Intenção 2027 Button */}
+                        <button
+                          type="button"
+                          onClick={() => setActiveCartaStudentId(student.id)}
+                          className="mt-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-md flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                          title="Abrir e Preencher Carta de Intenção de Rematrícula 2027"
+                        >
+                          <FileText size={12} />
+                          Carta de Intenção 2027
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -515,6 +530,40 @@ export default function RematriculaList({
             <span>Contato <strong>{copiedContact}</strong> copiado com sucesso!</span>
           </motion.div>
         )}
+
+        {activeCartaStudentId && (() => {
+          const st = students.find(s => s.id === activeCartaStudentId);
+          if (!st) return null;
+          const gd = guardians.find(g => g.alunoId === st.id && g.financeiro);
+          const en = enrollments.find(e => e.alunoId === st.id);
+          const ct = contraturnos.find(c => c.alunoId === st.id && c.dataFim === null);
+
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
+            >
+              <div className="w-full max-w-4xl my-2 sm:my-6 relative">
+                <CartaIntencaoForm
+                  student={st}
+                  guardian={gd}
+                  enrollment={en}
+                  activeContraturno={ct}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
+                  onSave={(updatedEn, logMov) => {
+                    if (onSaveEnrollment) {
+                      onSaveEnrollment(updatedEn, logMov);
+                    }
+                  }}
+                  onClose={() => setActiveCartaStudentId(null)}
+                />
+              </div>
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

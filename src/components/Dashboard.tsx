@@ -96,6 +96,12 @@ export default function Dashboard({
   const negotiating = validEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
   const pending = validEnrollments.filter(e => e.statusNegociacao === 'Pendente').length;
 
+  // 2027 Carta de Intenção Metrics
+  const cartasRegistradas2027 = enrollments.filter(e => e.contraturnoDesejado2027 || e.valorProposto2027).length;
+  const confirmados2027 = enrollments.filter(e => e.statusIntencao2027 === 'Confirmada').length;
+  const emAnalise2027 = enrollments.filter(e => e.statusIntencao2027 === 'Em Análise').length;
+  const naoRenovara2027 = enrollments.filter(e => e.statusIntencao2027 === 'Não Renovará').length;
+
   const confirmedPct = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmed / totalStudentsCount) * 100)) : 0;
   const negotiatingPct = totalStudentsCount > 0 ? Math.round((negotiating / totalStudentsCount) * 100) : 0;
   const pendingPct = totalStudentsCount > 0 ? Math.round((pending / totalStudentsCount) * 100) : 0;
@@ -398,12 +404,39 @@ export default function Dashboard({
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-150">
+          <div className="pt-4 border-t border-slate-150 space-y-3">
+            {/* Intenção 2027 Badge */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg space-y-2">
+              <div className="flex items-center justify-between text-amber-900 text-xs font-bold font-display uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <FileText size={14} className="text-amber-600" />
+                  Cartas de Intenção 2027
+                </span>
+                <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                  {cartasRegistradas2027} / {totalStudentsCount} Preenchidas
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
+                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
+                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Confirmam</span>
+                  <span className="text-emerald-700 font-extrabold font-mono text-xs">{confirmados2027}</span>
+                </div>
+                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
+                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Em Análise</span>
+                  <span className="text-amber-800 font-extrabold font-mono text-xs">{emAnalise2027}</span>
+                </div>
+                <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
+                  <span className="block text-[9px] text-slate-500 uppercase font-bold">Não Renovar</span>
+                  <span className="text-rose-700 font-extrabold font-mono text-xs">{naoRenovara2027}</span>
+                </div>
+              </div>
+            </div>
+
             <button 
               onClick={() => onNavigate('rematricula')}
               className="w-full py-2 px-4 bg-brand-cream hover:bg-brand-sand text-brand-green-dark border border-brand-sand text-xs font-bold rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer font-display"
             >
-              Gerenciar Lista de Rematrículas
+              Gerenciar Lista e Cartas de Rematrícula
               <ArrowRight size={14} className="text-brand-orange" />
             </button>
           </div>

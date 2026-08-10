@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass } from '../types';
+import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, RegularClass, ContraturnoPrice } from '../types';
 import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId } from '../data';
-import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw } from 'lucide-react';
+import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X, AlertCircle, FileImage, Calculator, Lock, Ban, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
+import CartaIntencaoForm from './CartaIntencaoForm';
 
 interface StudentProfileProps {
   students: Student[];
@@ -12,6 +13,7 @@ interface StudentProfileProps {
   contraturnos: ContraturnoSegment[];
   movements: FinancialMovement[];
   classPrices: RegularClass[];
+  contraturnoPrices?: ContraturnoPrice[];
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
@@ -24,6 +26,7 @@ interface StudentProfileProps {
   onUpdateEnrollmentClass: (alunoId: string, turmaRegularId: string) => void;
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
   onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => void;
+  onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
 }
 
 export default function StudentProfile({
@@ -33,6 +36,7 @@ export default function StudentProfile({
   contraturnos,
   movements,
   classPrices,
+  contraturnoPrices = [],
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
   onNavigateWithStudent,
@@ -44,15 +48,15 @@ export default function StudentProfile({
   onUpdateGuardian,
   onUpdateEnrollmentClass,
   onUpdateContraturnoNatureza,
-  onUpdateContraturnoDays
+  onUpdateContraturnoDays,
+  onSaveEnrollment
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ativo' | 'trancado' | 'cancelado' | 'todos'>('ativo');
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isEditingStudent, setIsEditingStudent] = useState(false);
-  // Controla se o painel de detalhes aparece como overlay em telas pequenas
-  // (evita ter que rolar até o fim da lista para ver a ficha do aluno)
+  const [showCartaModal, setShowCartaModal] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   useEffect(() => {
@@ -123,8 +127,11 @@ export default function StudentProfile({
   // Selected student computation
   const activeStudent = students.find(s => s.id === selectedStudentId);
   const activeGuardians = guardians.filter(g => g.alunoId === selectedStudentId);
+  const activeGuardian = activeGuardians.find(g => g.financeiro) || activeGuardians[0];
   const activeEnrollments = enrollments.filter(e => e.alunoId === selectedStudentId);
+  const activeEnrollment = activeEnrollments.find(e => e.ano === 2026) || activeEnrollments[0];
   const activeContraturnos = contraturnos.filter(c => c.alunoId === selectedStudentId);
+  const activeContraturno = activeContraturnos.find(c => c.dataFim === null) || activeContraturnos[0];
   const activeMovements = movements.filter(m => m.alunoId === selectedStudentId).sort((a,b) => b.data.localeCompare(a.data));
 
   const profileRef = useRef<HTMLDivElement>(null);
@@ -824,6 +831,15 @@ export default function StudentProfile({
                 {/* Direct Actions bar requested by user */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2" id="student-profile-actions-bar">
                   <button
+                    onClick={() => setShowCartaModal(true)}
+                    className="px-3.5 py-1.5 bg-brand-orange hover:bg-brand-orange-hover text-white text-[11px] font-bold font-display uppercase tracking-wider rounded-md flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    title="Carta de Intenção de Rematrícula 2027"
+                  >
+                    <FileText size={13} />
+                    Carta de Intenção 2027
+                  </button>
+
+                  <button
                     onClick={() => onNavigateWithStudent?.('negotiation', activeStudent.id)}
                     className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
@@ -1428,6 +1444,36 @@ export default function StudentProfile({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Carta de Intenção Modal */}
+      <AnimatePresence>
+        {showCartaModal && activeStudent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
+          >
+            <div className="w-full max-w-4xl my-2 sm:my-6 relative">
+              <CartaIntencaoForm
+                student={activeStudent}
+                guardian={activeGuardian}
+                enrollment={activeEnrollment}
+                activeContraturno={activeContraturno}
+                classPrices={classPrices}
+                contraturnoPrices={contraturnoPrices}
+                onSave={(updatedEn, logMov) => {
+                  if (onSaveEnrollment) {
+                    onSaveEnrollment(updatedEn, logMov);
+                  }
+                  setShowCartaModal(false);
+                }}
+                onClose={() => setShowCartaModal(false)}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
