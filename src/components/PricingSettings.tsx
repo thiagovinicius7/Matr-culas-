@@ -209,12 +209,12 @@ export default function PricingSettings({
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-3">
         <div>
-          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider">
+          <h2 className="text-base font-bold text-slate-800 flex items-center gap-2 uppercase tracking-wider font-display">
             <Sliders size={18} className="text-orange-500" />
-            Configuração de Mensalidades & Contraturno
+            Configurações
           </h2>
           <p className="text-xs text-slate-500">
-            Crie, remova ou atualize os valores de referência cobrados pelo Sítio-Escola. As simulações utilizarão estes valores em tempo real.
+            Gerencie valores de referência de mensalidades, tabelas do contraturno, ciclos de anos letivos e configurações do sistema.
           </p>
         </div>
         <div className="flex items-center gap-2">

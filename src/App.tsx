@@ -8,6 +8,7 @@ import { Student, Guardian, Enrollment, ContraturnoSegment, FinancialMovement, R
 import { 
   calculateAgeAtCutoff,
   getRegularClassForAge,
+  getRegularClassForAgeDynamic,
   REGULAR_CLASSES,
   normalizeClassId
 } from './data';
@@ -75,6 +76,9 @@ export default function App() {
   // Custom Pricing States
   const [classPrices, setClassPrices] = useState<RegularClass[]>([]);
   const [contraturnoPrices, setContraturnoPrices] = useState<ContraturnoPrice[]>([]);
+
+  // Active School Year (e.g. 2026, 2027)
+  const [activeYear, setActiveYear] = useState<number>(2026);
 
   // Selected student ID shared across components
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -618,11 +622,13 @@ export default function App() {
     const today = new Date().toISOString().split('T')[0];
 
     // Find current total monthly rates to compute before/after difference in statement log
-    const currentEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
+    const targetYear = enrollmentData.ano || 2026;
+    const currentEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === targetYear);
     const activeCont = contraturnos.find(c => c.alunoId === alunoId && c.dataFim === null);
     const prevRegularClass = currentEnrollment ? (classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(currentEnrollment.turmaRegularId))) : null;
     const prevLanche = (currentEnrollment?.adicionarLanche && prevRegularClass?.natureza === 'Fundamental') ? (currentEnrollment.valorLanche || 0) : 0;
-    const previousTotal = (currentEnrollment?.valorFinalRegular || 0) + (activeCont?.valorMensal || 0) + prevLanche;
+    const prevAlmoco = currentEnrollment?.adicionarAlmoco ? (currentEnrollment.valorAlmoco || 0) : 0;
+    const previousTotal = (currentEnrollment?.valorFinalRegular || 0) + (activeCont?.valorMensal || 0) + prevLanche + prevAlmoco;
 
     // 1. Update/Insert Enrollment
     let updatedEnrollment: Enrollment;
@@ -635,7 +641,7 @@ export default function App() {
     } else {
       updatedEnrollment = {
         ...enrollmentData,
-        id: `enroll_${Date.now()}`,
+        id: `enroll_${alunoId}_${targetYear}`,
         alunoId: alunoId
       };
       setEnrollments(prev => [...prev, updatedEnrollment]);
@@ -693,7 +699,8 @@ export default function App() {
     // 3. Log Financial Statement Movement
     const currentRegularClass = classPrices.find(rc => normalizeClassId(rc.id) === normalizeClassId(enrollmentData.turmaRegularId)) || REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(enrollmentData.turmaRegularId));
     const newLanche = (enrollmentData.adicionarLanche && currentRegularClass?.natureza === 'Fundamental') ? (enrollmentData.valorLanche || 0) : 0;
-    const newTotal = enrollmentData.valorFinalRegular + (contraturnoData ? contraturnoData.valorMensal : 0) + newLanche;
+    const newAlmoco = enrollmentData.adicionarAlmoco ? (enrollmentData.valorAlmoco || 0) : 0;
+    const newTotal = enrollmentData.valorFinalRegular + (contraturnoData ? contraturnoData.valorMensal : 0) + newLanche + newAlmoco;
     
     let moveType: FinancialMovement['tipo'] = 'Desconto_Alterado';
     if (contraturnoDescriptionAddon.includes('Ativação') || contraturnoDescriptionAddon.includes('Alteração')) {
@@ -1040,6 +1047,117 @@ export default function App() {
     showToast('Tabela de Preços Salva', `Configurações de mensalidades para o ano ${year} foram salvas.`, 'success');
   };
 
+  // Handler: Advance school year / Rollover to new academic year
+  const handleAdvanceSchoolYear = async (fromYear: number, targetYear: number) => {
+    try {
+      setLoading(true);
+      const newEnrollmentsToSave: Enrollment[] = [];
+      const newMovementsToSave: FinancialMovement[] = [];
+      const updatedEnrollments = [...enrollments];
+      const today = new Date().toISOString().split('T')[0];
+
+      // Filter active students
+      const activeStudentsList = students.filter(s => s.status === 'ativo');
+
+      for (const st of activeStudentsList) {
+        // Check if student already has an enrollment for targetYear
+        const existingTargetEnrollment = updatedEnrollments.find(e => e.alunoId === st.id && e.ano === targetYear);
+        if (existingTargetEnrollment) {
+          continue;
+        }
+
+        // Get previous year enrollment
+        const prevEnrollment = updatedEnrollments.find(e => e.alunoId === st.id && e.ano === fromYear);
+        
+        // Calculate next regular class based on age cutoff for targetYear
+        const ageInTargetYear = calculateAgeAtCutoff(st.nascimento, targetYear);
+        const nextClass = getRegularClassForAgeDynamic(ageInTargetYear, classPrices, targetYear);
+
+        const isOnlyContraturno = prevEnrollment?.turmaRegularId === 'sem_regular';
+        const baseRegularPrice = isOnlyContraturno ? 0 : nextClass.valorMensal;
+        
+        // Migrate discount from proposal or previous year
+        let regularDiscount = 0;
+        let finalRegularPrice = baseRegularPrice;
+
+        if (!isOnlyContraturno) {
+          if (prevEnrollment?.valorProposto2027 && targetYear === 2027) {
+            finalRegularPrice = prevEnrollment.valorProposto2027;
+            regularDiscount = Math.max(0, baseRegularPrice - finalRegularPrice);
+          } else if (prevEnrollment?.tipoDescontoRegular === 'porcentagem' && prevEnrollment.valorDescontoRegularInput) {
+            regularDiscount = Number((baseRegularPrice * (prevEnrollment.valorDescontoRegularInput / 100)).toFixed(2));
+            finalRegularPrice = Math.max(0, baseRegularPrice - regularDiscount);
+          } else if (prevEnrollment?.descontoMensal) {
+            regularDiscount = Math.min(prevEnrollment.descontoMensal, baseRegularPrice);
+            finalRegularPrice = Math.max(0, baseRegularPrice - regularDiscount);
+          }
+        }
+
+        const newEnrollment: Enrollment = {
+          id: `enroll_${st.id}_${targetYear}`,
+          alunoId: st.id,
+          ano: targetYear,
+          turmaRegularId: isOnlyContraturno ? 'sem_regular' : (prevEnrollment?.turmaPropostaId2027 && targetYear === 2027 ? prevEnrollment.turmaPropostaId2027 : nextClass.id),
+          valorRegularOriginal: baseRegularPrice,
+          descontoMensal: regularDiscount,
+          valorFinalRegular: finalRegularPrice,
+          statusNegociacao: 'Pendente',
+          anotacoes: `Transição automática para o ano letivo ${targetYear}. Turma: ${isOnlyContraturno ? 'Somente Contraturno' : nextClass.nome}.`,
+          tipoDescontoRegular: prevEnrollment?.tipoDescontoRegular || 'reais',
+          valorDescontoRegularInput: prevEnrollment?.valorDescontoRegularInput,
+          tipoDescontoContraturno: prevEnrollment?.tipoDescontoContraturno || 'reais',
+          valorDescontoContraturnoInput: prevEnrollment?.valorDescontoContraturnoInput,
+          descontoContraturno: prevEnrollment?.descontoContraturno || 0,
+          adicionarLanche: prevEnrollment?.adicionarLanche2027 !== undefined ? prevEnrollment.adicionarLanche2027 : (prevEnrollment?.adicionarLanche || false),
+          valorLanche: prevEnrollment?.valorLanche2027 || prevEnrollment?.valorLanche || 250,
+          adicionarAlmoco: prevEnrollment?.adicionarAlmoco2027 !== undefined ? prevEnrollment.adicionarAlmoco2027 : (prevEnrollment?.adicionarAlmoco || false),
+          valorAlmoco: prevEnrollment?.valorAlmoco2027 || prevEnrollment?.valorAlmoco || 500,
+          diaVencimento: (prevEnrollment?.diaVencimento2027 || prevEnrollment?.diaVencimento || '05') as any,
+          descontoPontualidadeRegular: prevEnrollment?.descontoPontualidadeRegular ?? true,
+          descontoPontualidadeContraturno: prevEnrollment?.descontoPontualidadeContraturno ?? false,
+          descontoPontualidade: true
+        };
+
+        newEnrollmentsToSave.push(newEnrollment);
+        updatedEnrollments.push(newEnrollment);
+
+        // Movement statement for rollover
+        const mov: FinancialMovement = {
+          id: `mov_rollover_${st.id}_${targetYear}_${Date.now()}`,
+          alunoId: st.id,
+          data: today,
+          tipo: 'Transição_Ano_Letivo',
+          descricao: `Ciclo letivo avançado de ${fromYear} para ${targetYear}. Rematrícula inicializada na turma ${nextClass.nome} com status Pendente.`,
+          valorAnterior: prevEnrollment?.valorFinalRegular || 0,
+          valorNovo: finalRegularPrice
+        };
+        newMovementsToSave.push(mov);
+      }
+
+      // Save in Firebase
+      await Promise.all([
+        ...newEnrollmentsToSave.map(e => saveDocument('enrollments', e)),
+        ...newMovementsToSave.map(m => saveDocument('movements', m))
+      ]);
+
+      setEnrollments(updatedEnrollments);
+      setMovements(prev => [...prev, ...newMovementsToSave]);
+      setActiveYear(targetYear);
+
+      showToast(
+        `Virada para o Ano Letivo ${targetYear} Concluída!`,
+        `${newEnrollmentsToSave.length} alunos avançaram de turma e suas rematrículas foram iniciadas como Pendentes no ciclo ${targetYear}.`,
+        'success',
+        7000
+      );
+    } catch (error) {
+      console.error('Error during school year rollover:', error);
+      showToast('Erro na Virada de Ano', 'Ocorreu um problema ao processar a virada de ano letivo.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handler: Update application security password
   const handleUpdatePassword = async (newPassword: string) => {
     setAppPassword(newPassword);
@@ -1053,11 +1171,19 @@ export default function App() {
     sessionStorage.removeItem('isLoggedIn');
   };
 
-  const totalStudentsCount = students.length;
-  const validStudentIds = new Set(students.map(s => s.id));
-  const valid2026Enrollments = enrollments.filter(e => e.ano === 2026 && validStudentIds.has(e.alunoId));
-  const confirmedEnrollmentsCount = valid2026Enrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
-  const pendingEnrollmentsCount = valid2026Enrollments.filter(e => e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação').length;
+  const availableYears = Array.from(
+    new Set([
+      2026,
+      ...enrollments.map(e => e.ano),
+      ...classPrices.map(cp => cp.ano || 2026)
+    ])
+  ).sort((a, b) => a - b);
+
+  const totalStudentsCount = students.filter(s => s.status === 'ativo').length;
+  const validStudentIds = new Set(students.filter(s => s.status === 'ativo').map(s => s.id));
+  const validActiveYearEnrollments = enrollments.filter(e => e.ano === activeYear && validStudentIds.has(e.alunoId));
+  const confirmedEnrollmentsCount = validActiveYearEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
+  const pendingEnrollmentsCount = validActiveYearEnrollments.filter(e => e.statusNegociacao === 'Pendente' || e.statusNegociacao === 'Em Negociação').length;
   const confirmedPercent = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmedEnrollmentsCount / totalStudentsCount) * 100)) : 0;
 
   if (loading) {
@@ -1243,10 +1369,8 @@ export default function App() {
           {[
             { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
             { id: 'students', label: 'Fichas de Alunos', icon: Users },
-            { id: 'negotiation', label: 'Calculadora de Acordo', icon: Calculator },
-            { id: 'rematricula', label: 'Lista de Trabalho', icon: ClipboardList },
-            { id: 'escala', label: 'Escala Contraturno', icon: CalendarDays },
-            { id: 'pricing', label: 'Configurar Mensalidades', icon: Settings },
+            { id: 'escala', label: 'Contraturno', icon: CalendarDays },
+            { id: 'pricing', label: 'Configurações', icon: Settings },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -1254,14 +1378,14 @@ export default function App() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-md transition-all ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
                   isActive 
                     ? 'bg-brand-green-light/30 text-white shadow-xs border-l-2 border-brand-orange' 
                     : 'text-emerald-100 hover:text-white hover:bg-brand-green-light/20'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-brand-orange' : 'text-emerald-300'} />
-                {tab.label}
+                <Icon size={15} className={isActive ? 'text-brand-orange' : 'text-emerald-300'} />
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -1334,10 +1458,8 @@ export default function App() {
               {[
                 { id: 'dashboard', label: 'Painel Principal', icon: LayoutDashboard },
                 { id: 'students', label: 'Fichas de Alunos', icon: Users },
-                { id: 'negotiation', label: 'Calculadora de Acordo', icon: Calculator },
-                { id: 'rematricula', label: 'Lista de Trabalho', icon: ClipboardList },
-                { id: 'escala', label: 'Escala Contraturno', icon: CalendarDays },
-                { id: 'pricing', label: 'Configurar Mensalidades', icon: Settings },
+                { id: 'escala', label: 'Contraturno', icon: CalendarDays },
+                { id: 'pricing', label: 'Configurações', icon: Settings },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -1391,7 +1513,7 @@ export default function App() {
               <p className="text-lg font-extrabold text-brand-green-dark leading-tight">{totalStudentsCount}</p>
             </div>
             <div className="sm:border-l sm:pl-8 border-slate-200">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Matriculados 2026</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Matriculados {activeYear}</p>
               <p className="text-lg font-extrabold text-brand-green-dark leading-tight">
                 {confirmedEnrollmentsCount} <span className="text-xs text-brand-green-light font-normal ml-1">({confirmedPercent}%)</span>
               </p>
@@ -1447,6 +1569,11 @@ export default function App() {
                   students={students} 
                   enrollments={enrollments} 
                   contraturnos={contraturnos} 
+                  activeYear={activeYear}
+                  availableYears={availableYears}
+                  onSelectActiveYear={setActiveYear}
+                  onAdvanceSchoolYear={handleAdvanceSchoolYear}
+                  classPrices={classPrices}
                   onNavigate={setActiveTab} 
                   onNavigateWithStudent={handleNavigateWithStudent}
                   onImportGeraniumData={handleImportGeraniumData}
@@ -1462,6 +1589,7 @@ export default function App() {
                   movements={movements}
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
+                  activeYear={activeYear}
                   selectedStudentId={selectedStudentId}
                   onSelectStudent={setSelectedStudentId}
                   onNavigateWithStudent={handleNavigateWithStudent}
@@ -1475,6 +1603,7 @@ export default function App() {
                   onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
                   onUpdateContraturnoDays={handleUpdateContraturnoDays}
                   onSaveEnrollment={handleSaveEnrollment}
+                  onConfirmNegotiation={handleConfirmNegotiation}
                 />
               )}
               {activeTab === 'negotiation' && (
@@ -1486,6 +1615,7 @@ export default function App() {
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   selectedStudentId={selectedStudentId}
+                  activeYear={activeYear}
                   onSelectStudent={setSelectedStudentId}
                   onConfirmNegotiation={handleConfirmNegotiation}
                 />
@@ -1499,6 +1629,7 @@ export default function App() {
                   classPrices={classPrices}
                   contraturnoPrices={contraturnoPrices}
                   preselectedStudentId={selectedStudentId}
+                  onNavigateBack={() => setActiveTab('dashboard')}
                   onUpdateEnrollmentStatus={handleUpdateEnrollmentStatus}
                   onUpdateEnrollmentNotes={handleUpdateEnrollmentNotes}
                   onUpdateEnrollmentDiscounts={handleUpdateEnrollmentDiscounts}
@@ -1511,6 +1642,7 @@ export default function App() {
                   contraturnos={contraturnos} 
                   enrollments={enrollments}
                   classPrices={classPrices}
+                  activeYear={activeYear}
                   onUpdateContraturnoNatureza={handleUpdateContraturnoNatureza}
                   onUpdateContraturnoDays={handleUpdateContraturnoDays}
                 />

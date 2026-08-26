@@ -5,6 +5,7 @@ import { User, Phone, Shield, Plus, Edit2, Trash2, Calendar, FileText, Check, X,
 import { motion, AnimatePresence } from 'motion/react';
 import * as htmlToImage from 'html-to-image';
 import CartaIntencaoForm from './CartaIntencaoForm';
+import NegotiationCalc from './NegotiationCalc';
 
 interface StudentProfileProps {
   students: Student[];
@@ -14,6 +15,7 @@ interface StudentProfileProps {
   movements: FinancialMovement[];
   classPrices: RegularClass[];
   contraturnoPrices?: ContraturnoPrice[];
+  activeYear?: number;
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
@@ -27,6 +29,11 @@ interface StudentProfileProps {
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
   onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: ('Seg' | 'Ter' | 'Qua' | 'Qui' | 'Sex')[]) => void;
   onSaveEnrollment?: (updatedEnrollment: Enrollment, logMovement?: boolean) => void;
+  onConfirmNegotiation?: (
+    alunoId: string,
+    enrollmentData: Omit<Enrollment, 'id' | 'alunoId'>,
+    contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null
+  ) => void;
 }
 
 export default function StudentProfile({
@@ -37,6 +44,7 @@ export default function StudentProfile({
   movements,
   classPrices,
   contraturnoPrices = [],
+  activeYear = 2026,
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
   onNavigateWithStudent,
@@ -49,7 +57,8 @@ export default function StudentProfile({
   onUpdateEnrollmentClass,
   onUpdateContraturnoNatureza,
   onUpdateContraturnoDays,
-  onSaveEnrollment
+  onSaveEnrollment,
+  onConfirmNegotiation
 }: StudentProfileProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || students[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +66,7 @@ export default function StudentProfile({
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [isEditingStudent, setIsEditingStudent] = useState(false);
   const [showCartaModal, setShowCartaModal] = useState(false);
+  const [showNegotiationModal, setShowNegotiationModal] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
 
   useEffect(() => {
@@ -371,53 +381,71 @@ export default function StudentProfile({
           </div>
         </div>
 
-        <div className="max-h-[500px] overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
+        <div className="max-h-[520px] overflow-y-auto divide-y divide-slate-100 pr-1 space-y-1">
           {filteredStudents.map((st) => {
             const isSelected = st.id === selectedStudentId;
-            const bAge = calculateAgeAtCutoff(st.nascimento, 2026);
+            const bAge = calculateAgeAtCutoff(st.nascimento, activeYear);
             const bClass = getRegularClassForAge(bAge);
             return (
-              <button
+              <div
                 key={st.id}
-                onClick={() => {
-                  setSelectedStudentId(st.id);
-                  onSelectStudent?.(st.id);
-                  setIsAddingStudent(false);
-                  setIsEditingStudent(false);
-                  setIsAddingSingleGuardian(false);
-                  setMobileDetailOpen(true);
-                }}
-                className={`w-full text-left p-2.5 rounded-md transition-all flex items-center justify-between cursor-pointer ${
-                  isSelected ? 'bg-emerald-50 border-l-4 border-emerald-600' : 'hover:bg-slate-50'
+                className={`w-full rounded-lg transition-all border ${
+                  isSelected ? 'bg-emerald-50/80 border-emerald-500 shadow-2xs' : 'border-transparent hover:bg-slate-50'
                 }`}
               >
-                <div>
-                  <h4 className="font-bold text-xs text-slate-800">{st.nome}</h4>
-                  <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    Nasc: {new Date(st.nascimento + 'T00:00:00').toLocaleDateString('pt-BR')} • {bAge} anos
-                  </p>
+                <div className="p-2.5 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedStudentId(st.id);
+                      onSelectStudent?.(st.id);
+                      setIsAddingStudent(false);
+                      setIsEditingStudent(false);
+                      setIsAddingSingleGuardian(false);
+                      setMobileDetailOpen(true);
+                    }}
+                    className="flex-1 text-left cursor-pointer min-w-0"
+                  >
+                    <h4 className="font-bold text-xs text-slate-800 truncate">{st.nome}</h4>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      {bAge} anos • <span className="text-slate-700 font-semibold">{bClass.nome}</span>
+                    </p>
+                  </button>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedStudentId(st.id);
+                        onSelectStudent?.(st.id);
+                        setShowNegotiationModal(true);
+                      }}
+                      className="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-bold rounded-md flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                      title={`Abrir Calculadora de Acordo para ${st.nome}`}
+                    >
+                      <Calculator size={12} className="text-amber-800" />
+                      <span>Acordo</span>
+                    </button>
+
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      st.status === 'ativo' 
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                        : st.status === 'trancado' 
+                        ? 'bg-amber-100 text-amber-900 border border-amber-300' 
+                        : st.status === 'cancelado' 
+                        ? 'bg-rose-100 text-rose-900 border border-rose-300' 
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {st.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    st.status === 'ativo' 
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                      : st.status === 'trancado' 
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300' 
-                      : st.status === 'cancelado' 
-                      ? 'bg-rose-100 text-rose-900 border border-rose-300' 
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {st.status}
-                  </span>
-                  <span className="text-[9px] font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">
-                    {bClass.nome}
-                  </span>
-                </div>
-              </button>
+              </div>
             );
           })}
           {filteredStudents.length === 0 && (
-            <p className="text-xs text-slate-400 text-center py-8">Nenhum aluno encontrado.</p>
+            <p className="text-xs text-slate-400 text-center py-8">Nenhum aluno encontrado com "{searchQuery}".</p>
           )}
         </div>
       </div>
@@ -840,11 +868,12 @@ export default function StudentProfile({
                   </button>
 
                   <button
-                    onClick={() => onNavigateWithStudent?.('negotiation', activeStudent.id)}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                    onClick={() => setShowNegotiationModal(true)}
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    title={`Abrir Calculadora de Acordo para ${activeStudent.nome}`}
                   >
                     <Calculator size={13} />
-                    Ir para Calculadora de Acordo
+                    Calculadora de Acordo
                   </button>
 
                   {activeStudent.status === 'ativo' ? (
@@ -1472,6 +1501,80 @@ export default function StudentProfile({
               />
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Calculadora de Acordo Modal */}
+      <AnimatePresence>
+        {showNegotiationModal && activeStudent && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              className="bg-white rounded-xl shadow-2xl max-w-6xl w-full flex flex-col overflow-hidden border border-slate-200 my-4"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-brand-green-dark to-emerald-950 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs">
+                    <Calculator size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Calculadora de Acordo Comercial • {activeStudent.nome}
+                    </h3>
+                    <p className="text-xs text-emerald-200">
+                      Simule valores, personalize mensalidades regulares e contraturnos e salve o acordo diretamente no Firebase.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNegotiationModal(false)}
+                  className="p-1.5 text-emerald-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                  title="Fechar Calculadora"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-6 bg-slate-50 overflow-y-auto max-h-[80vh]">
+                <NegotiationCalc
+                  students={students}
+                  guardians={guardians}
+                  enrollments={enrollments}
+                  contraturnos={contraturnos}
+                  classPrices={classPrices}
+                  contraturnoPrices={contraturnoPrices}
+                  activeYear={activeYear}
+                  selectedStudentId={activeStudent.id}
+                  onSelectStudent={(id) => {
+                    setSelectedStudentId(id);
+                    onSelectStudent?.(id);
+                  }}
+                  onConfirmNegotiation={(alunoId, eData, cData) => {
+                    if (onConfirmNegotiation) {
+                      onConfirmNegotiation(alunoId, eData, cData);
+                    }
+                    setShowNegotiationModal(false);
+                  }}
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 bg-white border-t border-slate-200 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowNegotiationModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors cursor-pointer"
+                >
+                  Fechar Calculadora
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

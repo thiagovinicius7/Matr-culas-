@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Student, Guardian, Enrollment, ContraturnoSegment, RegularClass, ContraturnoPrice } from '../types';
 import { REGULAR_CLASSES, getContraturnoPriceDynamic, normalizeClassId } from '../data';
-import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Phone, Search, Save, MessageSquare, Copy, Edit2, Check, X, FileText, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import CartaIntencaoForm from './CartaIntencaoForm';
 
@@ -13,6 +13,7 @@ interface RematriculaListProps {
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
   preselectedStudentId?: string;
+  onNavigateBack?: () => void;
   onUpdateEnrollmentStatus: (alunoId: string, status: Enrollment['statusNegociacao']) => void;
   onUpdateEnrollmentNotes: (alunoId: string, notes: string) => void;
   onUpdateEnrollmentDiscounts: (alunoId: string, discountRegular: number, discountContraturno: number) => void;
@@ -27,6 +28,7 @@ export default function RematriculaList({
   classPrices,
   contraturnoPrices,
   preselectedStudentId,
+  onNavigateBack,
   onUpdateEnrollmentStatus,
   onUpdateEnrollmentNotes,
   onUpdateEnrollmentDiscounts,
@@ -140,11 +142,24 @@ export default function RematriculaList({
   return (
     <div className="space-y-4" id="rematricula-workspace">
       {/* Header and Counters */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-b border-slate-200 pb-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-800 uppercase tracking-wider">
-            Lista de Trabalho de Rematrícula
-          </h2>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {onNavigateBack && (
+              <button
+                type="button"
+                onClick={onNavigateBack}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-md flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200 shadow-2xs mr-1"
+                title="Voltar para o Painel Principal"
+              >
+                <ArrowLeft size={14} />
+                <span>Voltar ao Painel</span>
+              </button>
+            )}
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wider font-display">
+              Lista de Trabalho de Rematrícula
+            </h2>
+          </div>
           <p className="text-xs text-slate-500">
             Gerencie o contato com pais, acompanhe acordos comerciais, salve observações e controle o status da rematrícula.
           </p>

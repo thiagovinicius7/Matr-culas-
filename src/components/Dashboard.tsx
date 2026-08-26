@@ -1,15 +1,37 @@
 import React, { useState } from 'react';
-import { Student, Enrollment, ContraturnoSegment } from '../types';
-import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAge, normalizeClassId } from '../data';
-import { Users, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar, ArrowRight, Search, FileText, Calculator, ClipboardList, Database, RefreshCw, Trash2, X } from 'lucide-react';
+import { Student, Enrollment, ContraturnoSegment, RegularClass } from '../types';
+import { REGULAR_CLASSES, calculateAgeAtCutoff, getRegularClassForAgeDynamic, normalizeClassId } from '../data';
+import { 
+  Users, 
+  CheckCircle, 
+  Clock, 
+  TrendingUp, 
+  Calendar, 
+  ArrowRight, 
+  Search, 
+  FileText, 
+  Calculator, 
+  ClipboardList, 
+  X, 
+  Sparkles,
+  ArrowRightCircle,
+  AlertTriangle,
+  RotateCw,
+  ChevronDown
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface DashboardProps {
   students: Student[];
   enrollments: Enrollment[];
   contraturnos: ContraturnoSegment[];
+  classPrices?: RegularClass[];
+  activeYear?: number;
+  availableYears?: number[];
   onNavigate: (tab: string) => void;
   onNavigateWithStudent?: (tabId: string, studentId: string) => void;
+  onSelectActiveYear?: (year: number) => void;
+  onAdvanceSchoolYear?: (fromYear: number, targetYear: number) => Promise<void> | void;
   onImportGeraniumData?: () => void;
   onClearDatabase?: () => void;
 }
@@ -18,8 +40,13 @@ export default function Dashboard({
   students, 
   enrollments, 
   contraturnos, 
+  classPrices = [],
+  activeYear = 2026,
+  availableYears = [2026, 2027],
   onNavigate, 
   onNavigateWithStudent,
+  onSelectActiveYear,
+  onAdvanceSchoolYear,
   onImportGeraniumData, 
   onClearDatabase 
 }: DashboardProps) {
@@ -32,15 +59,29 @@ export default function Dashboard({
     valorMensal: number;
   } | null>(null);
   const [modalSearch, setModalSearch] = useState('');
+  const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
+  const [targetRolloverYear, setTargetRolloverYear] = useState<number>(activeYear === 2026 ? 2027 : activeYear + 1);
+  const [isProcessingRollover, setIsProcessingRollover] = useState(false);
 
-  // Helper to accurately resolve effective regular class for any student (stripping 2026_ prefix if present)
-  const getStudentClassId = (student: Student): string => {
-    const e = enrollments.find(e => e.alunoId === student.id);
+  // Helper to accurately resolve effective regular class for any student in activeYear
+  const getStudentClassInfo = (student: Student) => {
+    const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id);
     if (e && e.turmaRegularId) {
-      return normalizeClassId(e.turmaRegularId);
+      if (e.turmaRegularId === 'sem_regular') {
+        return { id: 'sem_regular', nome: 'Somente Contraturno', natureza: 'Isento', valorMensal: 0, idadeRef: 0 };
+      }
+      const cls = (classPrices.length > 0 ? classPrices : REGULAR_CLASSES).find(
+        c => normalizeClassId(c.id) === normalizeClassId(e.turmaRegularId)
+      );
+      if (cls) return cls;
     }
-    const age = calculateAgeAtCutoff(student.nascimento, 2026);
-    return normalizeClassId(getRegularClassForAge(age).id);
+    const age = calculateAgeAtCutoff(student.nascimento, activeYear);
+    return getRegularClassForAgeDynamic(age, classPrices, activeYear);
+  };
+
+  const getStudentClassId = (student: Student): string => {
+    const info = getStudentClassInfo(student);
+    return normalizeClassId(info.id);
   };
 
   const getModalClassStudents = () => {
@@ -50,16 +91,16 @@ export default function Dashboard({
     return students
       .filter(student => getStudentClassId(student) === targetClassId)
       .map(student => {
-        const e = enrollments.find(e => e.alunoId === student.id) || {
+        const e = enrollments.find(e => e.alunoId === student.id && e.ano === activeYear) || enrollments.find(e => e.alunoId === student.id) || {
           id: `enroll_auto_${student.id}`,
           alunoId: student.id,
-          ano: 2026,
-          turmaRegularId: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).id,
-          valorRegularOriginal: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).valorMensal,
+          ano: activeYear,
+          turmaRegularId: getRegularClassForAgeDynamic(calculateAgeAtCutoff(student.nascimento, activeYear), classPrices, activeYear).id,
+          valorRegularOriginal: getRegularClassForAgeDynamic(calculateAgeAtCutoff(student.nascimento, activeYear), classPrices, activeYear).valorMensal,
           descontoMensal: 0,
-          valorFinalRegular: getRegularClassForAge(calculateAgeAtCutoff(student.nascimento, 2026)).valorMensal,
+          valorFinalRegular: getRegularClassForAgeDynamic(calculateAgeAtCutoff(student.nascimento, activeYear), classPrices, activeYear).valorMensal,
           statusNegociacao: 'Pendente',
-          anotacoes: 'Matrícula Sítio Geranium'
+          anotacoes: `Matrícula Sítio Geranium ${activeYear}`
         };
         const activeContraturno = contraturnos.find(c => c.alunoId === student.id && c.dataFim === null);
         return {
@@ -82,39 +123,41 @@ export default function Dashboard({
     studentCountByClassId[classId] = (studentCountByClassId[classId] || 0) + 1;
   });
 
-  // Stats calculations
+  // Stats calculations for ACTIVE YEAR
   const activeStudents = students.filter(s => s.status === 'ativo');
   const totalStudentsCount = students.length;
   const activeStudentsCount = activeStudents.length;
 
-  // Rematrícula Funnel - Filter to active students only
+  // Rematrícula Funnel - Filter to active students in activeYear
   const activeStudentIds = new Set(activeStudents.map(s => s.id));
-  const validEnrollments = enrollments.filter(e => activeStudentIds.has(e.alunoId));
+  const validEnrollments = enrollments.filter(e => e.ano === activeYear && activeStudentIds.has(e.alunoId));
 
-  const totalEnrollments = validEnrollments.length;
   const confirmed = validEnrollments.filter(e => e.statusNegociacao === 'Confirmada').length;
   const negotiating = validEnrollments.filter(e => e.statusNegociacao === 'Em Negociação').length;
-  const pending = validEnrollments.filter(e => e.statusNegociacao === 'Pendente').length;
+  const pending = activeStudentsCount - confirmed - negotiating;
 
-  // 2027 Carta de Intenção Metrics
-  const cartasRegistradas2027 = enrollments.filter(e => e.contraturnoDesejado2027 || e.valorProposto2027).length;
-  const confirmados2027 = enrollments.filter(e => e.statusIntencao2027 === 'Confirmada').length;
-  const emAnalise2027 = enrollments.filter(e => e.statusIntencao2027 === 'Em Análise').length;
-  const naoRenovara2027 = enrollments.filter(e => e.statusIntencao2027 === 'Não Renovará').length;
+  // 2027 Carta de Intenção Metrics (or next year intent)
+  const nextYear = activeYear + 1;
+  const cartasRegistradasNextYear = enrollments.filter(e => e.contraturnoDesejado2027 || e.valorProposto2027 || e.statusIntencao2027).length;
+  const confirmadosNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Confirmada').length;
+  const emAnaliseNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Em Análise').length;
+  const naoRenovaraNextYear = enrollments.filter(e => e.statusIntencao2027 === 'Não Renovará').length;
 
   const confirmedPct = totalStudentsCount > 0 ? Math.min(100, Math.round((confirmed / totalStudentsCount) * 100)) : 0;
   const negotiatingPct = totalStudentsCount > 0 ? Math.round((negotiating / totalStudentsCount) * 100) : 0;
-  const pendingPct = totalStudentsCount > 0 ? Math.round((pending / totalStudentsCount) * 100) : 0;
+  const pendingPct = totalStudentsCount > 0 ? Math.max(0, 100 - confirmedPct - negotiatingPct) : 0;
 
   // Monthly Revenue Estimate (Regular + Contraturnos)
   const activeContraturnos = contraturnos.filter(c => c.dataFim === null);
   const contraturnoRevenue = activeContraturnos.reduce((sum, c) => sum + c.valorMensal, 0);
 
-  // 1) Regular revenue WITHOUT prompt payment discount (Sem Desconto de Pontualidade)
-  const regularRevenueGross = enrollments
+  // 1) Regular revenue WITHOUT prompt payment discount
+  const regularRevenueGross = validEnrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
-      const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
+      const regularClass = (classPrices.length > 0 ? classPrices : REGULAR_CLASSES).find(
+        rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)
+      );
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
       return sum + e.valorFinalRegular + lancheVal + almocoVal;
@@ -123,11 +166,13 @@ export default function Dashboard({
   // Totals combining Regular + Contraturnos
   const totalRevenueWithoutDiscount = regularRevenueGross + contraturnoRevenue;
 
-  // 2) Total revenue WITH prompt payment discount applied
-  const totalRevenueWithDiscount = enrollments
+  // 2) Total revenue WITH prompt payment discount applied (3%)
+  const totalRevenueWithDiscount = validEnrollments
     .filter(e => e.statusNegociacao === 'Confirmada')
     .reduce((sum, e) => {
-      const regularClass = REGULAR_CLASSES.find(rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId));
+      const regularClass = (classPrices.length > 0 ? classPrices : REGULAR_CLASSES).find(
+        rc => normalizeClassId(rc.id) === normalizeClassId(e.turmaRegularId)
+      );
       const isOnlyContraturno = e.turmaRegularId === 'sem_regular';
       const lancheVal = (e.adicionarLanche && regularClass?.natureza === 'Fundamental') ? (e.valorLanche || 0) : 0;
       const almocoVal = e.adicionarAlmoco ? (e.valorAlmoco || 0) : 0;
@@ -150,10 +195,13 @@ export default function Dashboard({
 
       const studentNetTotal = (regularSubtotal + contraturnoSubtotal + almocoSubtotal) - (discReg + discCont);
       return sum + studentNetTotal;
-    }, 0) + contraturnos.filter(c => c.dataFim === null && !enrollments.some(e => e.alunoId === c.alunoId && e.statusNegociacao === 'Confirmada')).reduce((sum, c) => sum + c.valorMensal, 0);
+    }, 0) + contraturnos.filter(c => c.dataFim === null && !validEnrollments.some(e => e.alunoId === c.alunoId && e.statusNegociacao === 'Confirmada')).reduce((sum, c) => sum + c.valorMensal, 0);
 
-  // Distribution by Class
-  const classDistribution = REGULAR_CLASSES.map(cls => {
+  // Distribution by Class for activeYear
+  const effectiveClassList = classPrices.filter(c => (c.ano || 2026) === activeYear);
+  const baseClasses = effectiveClassList.length > 0 ? effectiveClassList : REGULAR_CLASSES;
+
+  const classDistribution = baseClasses.map(cls => {
     const normId = normalizeClassId(cls.id);
     return {
       ...cls,
@@ -163,30 +211,101 @@ export default function Dashboard({
 
   const contraturnoOnlyCount = studentCountByClassId['sem_regular'] || 0;
 
+  const handleConfirmRollover = async () => {
+    if (!onAdvanceSchoolYear) return;
+    try {
+      setIsProcessingRollover(true);
+      await onAdvanceSchoolYear(activeYear, targetRolloverYear);
+      setIsRolloverModalOpen(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsProcessingRollover(false);
+    }
+  };
+
   return (
     <div className="space-y-6" id="dashboard-container">
-      {/* Header with quick stats & discrete data management */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-100 pb-4">
+      {/* Top Banner: Ano Letivo Ativo & Ação de Virada de Ano */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold font-display rounded-md flex items-center gap-1.5 uppercase tracking-wide">
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+              Ano Letivo Ativo: {activeYear}
+            </span>
+
+            {/* Quick selector of available years */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md border border-slate-200">
+              {availableYears.map(yr => (
+                <button
+                  key={yr}
+                  onClick={() => onSelectActiveYear?.(yr)}
+                  className={`px-2.5 py-0.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                    activeYear === yr 
+                      ? 'bg-brand-green-dark text-white shadow-2xs' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                  }`}
+                >
+                  {yr}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 font-sans">
+            Todos os cálculos, status de rematrícula, progressão de turmas e faturamento refletem o ciclo <strong>{activeYear}</strong>.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setTargetRolloverYear(activeYear === 2026 ? 2027 : activeYear + 1);
+              setIsRolloverModalOpen(true);
+            }}
+            className="px-4 py-2 bg-gradient-to-r from-amber-500 to-brand-orange hover:from-amber-600 hover:to-brand-orange-hover text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer font-display"
+            title="Mudar o ano letivo para iniciar o ciclo de rematrículas para o próximo ano"
+          >
+            <Sparkles size={15} className="animate-spin-slow" />
+            <span>Virar Ano Letivo / Iniciar Ciclo {activeYear === 2026 ? 2027 : activeYear + 1}</span>
+            <ArrowRightCircle size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* Notice if viewing a new cycle (e.g. 2027) with pending enrollments */}
+      {activeYear >= 2027 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3 shadow-2xs">
+          <div className="p-2 bg-amber-200 text-amber-900 rounded-lg shrink-0 mt-0.5">
+            <RotateCw size={18} className="animate-spin-slow" />
+          </div>
+          <div className="space-y-1 text-xs text-amber-950 flex-1">
+            <h4 className="font-bold text-sm font-display text-amber-900">
+              Ciclo de Rematrículas {activeYear} em Andamento
+            </h4>
+            <p className="text-amber-900/90 leading-relaxed">
+              O sistema migrou os alunos para o ano {activeYear}: as turmas regulares avançaram automaticamente para a faixa etária correspondente, todos os acordos financeiros foram transferidos como proposta inicial e o status foi reiniciado para <strong>"Pendente"</strong>. Conforme você fechar os acordos na <strong>Lista de Trabalho</strong>, o funil e os valores se consolidarão como confirmados.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Header with quick stats */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 border-b border-slate-150 pb-2">
         <div>
           <h2 className="text-xl font-display font-extrabold tracking-tight text-brand-green-dark">
             Painel Principal
           </h2>
           <p className="text-xs text-slate-500 font-sans mt-0.5">
-            Visão geral da comunidade Sítio-escola: alunos, rematrículas e receitas vigentes.
+            Visão geral da comunidade Sítio-escola: alunos, rematrículas e receitas vigentes em {activeYear}.
           </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-          {/* Status badge */}
           <span className="px-2.5 py-1.5 bg-emerald-50 text-emerald-800 text-[10px] font-bold uppercase rounded-md border border-emerald-200/60 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             Base Firebase: {students.length} Alunos Cadastrados
           </span>
-
-          <div className="text-[10px] uppercase tracking-wider font-bold bg-brand-sand text-brand-green-dark px-3 py-1.5 rounded-md border border-slate-200/60 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse"></span>
-            Período Letivo: 2026
-          </div>
         </div>
       </div>
 
@@ -218,14 +337,14 @@ export default function Dashboard({
               .filter(s => s.nome.toLowerCase().includes(quickSearch.toLowerCase()))
               .slice(0, 5)
               .map(student => {
-                const age = calculateAgeAtCutoff(student.nascimento, 2026);
-                const regularClass = getRegularClassForAge(age);
+                const age = calculateAgeAtCutoff(student.nascimento, activeYear);
+                const regularClass = getRegularClassForAgeDynamic(age, classPrices, activeYear);
                 return (
                   <div key={student.id} className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/50 transition-colors">
                     <div className="space-y-1">
                       <h4 className="text-xs font-bold text-slate-800">{student.nome}</h4>
                       <p className="text-[10px] text-slate-500">
-                        Idade: {age} anos • Turma Regular: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
+                        Idade ({activeYear}): {age} anos • Turma Regular: <span className="font-semibold text-brand-green-dark">{regularClass.nome}</span>
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -277,7 +396,7 @@ export default function Dashboard({
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total de Alunos</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{totalStudentsCount}</h3>
-            <p className="text-[10px] text-slate-400 mt-0.5">{activeStudentsCount} ativos atualmente</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{activeStudentsCount} ativos no ciclo {activeYear}</p>
           </div>
         </motion.div>
 
@@ -291,7 +410,7 @@ export default function Dashboard({
             <CheckCircle size={20} />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Rematrículas Confirmadas</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Confirmadas ({activeYear})</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{confirmed}</h3>
             <p className="text-[10px] text-slate-400 mt-0.5">{confirmedPct}% do corpo discente</p>
           </div>
@@ -307,9 +426,9 @@ export default function Dashboard({
             <Clock size={20} />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Em Negociação</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Em Negociação ({activeYear})</p>
             <h3 className="text-lg font-bold text-brand-green-dark mt-0.5">{negotiating}</h3>
-            <p className="text-[10px] text-slate-400 mt-0.5">{negotiatingPct}% pendentes de desfecho</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{negotiatingPct}% em andamento</p>
           </div>
         </motion.div>
 
@@ -324,7 +443,7 @@ export default function Dashboard({
               <TrendingUp size={18} />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Receita Mensal Ativa</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Receita Mensal ({activeYear})</p>
               <p className="text-[10px] text-slate-400 font-sans">Regular + Contraturnos</p>
             </div>
           </div>
@@ -355,10 +474,10 @@ export default function Dashboard({
         <div className="lg:col-span-5 bg-white p-5 rounded-lg border border-slate-200 shadow-xs space-y-4 flex flex-col justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-800 mb-1">
-              Funil de Rematrícula 2026
+              Funil de Rematrícula {activeYear}
             </h3>
             <p className="text-xs text-slate-500">
-              Progresso atual de renovação de contratos e matrículas regulares da escola.
+              Progresso atual de renovação de contratos e matrículas regulares da escola no ano letivo {activeYear}.
             </p>
           </div>
 
@@ -405,39 +524,40 @@ export default function Dashboard({
           </div>
 
           <div className="pt-4 border-t border-slate-150 space-y-3">
-            {/* Intenção 2027 Badge */}
+            {/* Intenção Carta Badge */}
             <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-lg space-y-2">
               <div className="flex items-center justify-between text-amber-900 text-xs font-bold font-display uppercase tracking-wider">
                 <span className="flex items-center gap-1.5">
                   <FileText size={14} className="text-amber-600" />
-                  Cartas de Intenção 2027
+                  Cartas de Intenção {nextYear}
                 </span>
                 <span className="bg-amber-200/80 text-amber-900 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                  {cartasRegistradas2027} / {totalStudentsCount} Preenchidas
+                  {cartasRegistradasNextYear} / {totalStudentsCount} Preenchidas
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-semibold">
                 <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
                   <span className="block text-[9px] text-slate-500 uppercase font-bold">Confirmam</span>
-                  <span className="text-emerald-700 font-extrabold font-mono text-xs">{confirmados2027}</span>
+                  <span className="text-emerald-700 font-extrabold font-mono text-xs">{confirmadosNextYear}</span>
                 </div>
                 <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
                   <span className="block text-[9px] text-slate-500 uppercase font-bold">Em Análise</span>
-                  <span className="text-amber-800 font-extrabold font-mono text-xs">{emAnalise2027}</span>
+                  <span className="text-amber-800 font-extrabold font-mono text-xs">{emAnaliseNextYear}</span>
                 </div>
                 <div className="bg-white p-1.5 rounded border border-amber-200/60 shadow-2xs">
                   <span className="block text-[9px] text-slate-500 uppercase font-bold">Não Renovar</span>
-                  <span className="text-rose-700 font-extrabold font-mono text-xs">{naoRenovara2027}</span>
+                  <span className="text-rose-700 font-extrabold font-mono text-xs">{naoRenovaraNextYear}</span>
                 </div>
               </div>
             </div>
 
             <button 
               onClick={() => onNavigate('rematricula')}
-              className="w-full py-2 px-4 bg-brand-cream hover:bg-brand-sand text-brand-green-dark border border-brand-sand text-xs font-bold rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer font-display"
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-cream to-amber-50 hover:from-brand-sand hover:to-amber-100 text-brand-green-dark border border-amber-200 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer font-display shadow-2xs"
             >
-              Gerenciar Lista e Cartas de Rematrícula
-              <ArrowRight size={14} className="text-brand-orange" />
+              <ClipboardList size={15} className="text-brand-orange" />
+              <span>Abrir Lista de Trabalho • Rematrículas</span>
+              <ArrowRight size={14} className="text-brand-orange ml-auto" />
             </button>
           </div>
         </div>
@@ -446,10 +566,10 @@ export default function Dashboard({
         <div className="lg:col-span-7 bg-white p-5 rounded-lg border border-slate-200 shadow-xs space-y-4">
           <div>
             <h3 className="text-base font-bold text-slate-800 mb-1">
-              Colmeias de Aprendizado (Turmas Regulares)
+              Colmeias de Aprendizado ({activeYear})
             </h3>
             <p className="text-xs text-slate-500">
-              Distribuição de alunos matriculados nas turmas baseadas nas espécies de abelhas nativas e idade de corte (31/03).
+              Distribuição de alunos nas turmas baseadas nas espécies de abelhas nativas e idade de corte (31/03/{activeYear}).
             </p>
           </div>
 
@@ -572,7 +692,7 @@ export default function Dashboard({
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-display font-bold text-base sm:text-lg text-white">
-                        Turma {selectedClassForModal.nome}
+                        Turma {selectedClassForModal.nome} ({activeYear})
                       </h3>
                       <span className="px-2 py-0.5 bg-brand-orange text-white text-[10px] font-extrabold uppercase rounded-full">
                         {studentCountByClassId[normalizeClassId(selectedClassForModal.id)] || 0} Alunos
@@ -616,22 +736,29 @@ export default function Dashboard({
                 {getModalClassStudents().length === 0 ? (
                   <div className="p-8 text-center text-slate-500 space-y-2">
                     <Users size={32} className="mx-auto text-slate-300" />
-                    <p className="text-xs font-semibold">Nenhum aluno encontrado nesta turma.</p>
+                    <p className="text-xs font-semibold">Nenhum aluno encontrado nesta turma para o ano {activeYear}.</p>
                   </div>
                 ) : (
                   getModalClassStudents().map(({ student, enrollment, contraturno }, idx) => {
-                    const age = calculateAgeAtCutoff(student.nascimento, 2026);
+                    const age = calculateAgeAtCutoff(student.nascimento, activeYear);
+                    const isConfirmed = enrollment?.statusNegociacao === 'Confirmada';
                     return (
                       <div 
                         key={student.id} 
-                        className="p-3.5 bg-white rounded-lg border border-slate-200/80 shadow-2xs hover:border-brand-green-light transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                        className={`p-3.5 rounded-lg border transition-all flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                          isConfirmed ? 'bg-white border-slate-200/80' : 'bg-amber-50/60 border-amber-200'
+                        }`}
                       >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-slate-400 font-mono">{idx + 1}.</span>
                             <h4 className="text-xs font-bold text-slate-900 font-display">{student.nome}</h4>
-                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-bold rounded">
-                              Confirmada
+                            <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+                              isConfirmed 
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                : 'bg-amber-100 text-amber-900 border border-amber-300'
+                            }`}>
+                              {enrollment?.statusNegociacao || 'Pendente'}
                             </span>
                           </div>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
@@ -688,6 +815,121 @@ export default function Dashboard({
                   className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-md transition-colors cursor-pointer"
                 >
                   Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE VIRADA DE ANO LETIVO / REMATRÍCULA */}
+      <AnimatePresence>
+        {isRolloverModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-xl shadow-2xl max-w-xl w-full flex flex-col overflow-hidden border border-slate-200"
+            >
+              {/* Modal Header */}
+              <div className="p-5 bg-gradient-to-r from-brand-green-dark to-emerald-900 text-white flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand-orange text-white rounded-xl shadow-xs">
+                    <Sparkles size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Virada do Ano Letivo • Iniciar Ciclo {targetRolloverYear}
+                    </h3>
+                    <p className="text-xs text-emerald-200">
+                      Preparação em massa para a campanha de rematrículas {targetRolloverYear}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsRolloverModalOpen(false)}
+                  disabled={isProcessingRollover}
+                  className="p-1.5 text-emerald-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 space-y-4 text-xs text-slate-700 font-sans">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 space-y-1.5 text-amber-900">
+                  <h4 className="font-bold text-sm flex items-center gap-2 text-amber-950 font-display">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                    Como funciona a transição para {targetRolloverYear}:
+                  </h4>
+                  <ul className="space-y-1.5 list-disc pl-4 text-xs leading-relaxed text-amber-900/90">
+                    <li>
+                      <strong>Status Reiniciado:</strong> Todas as matrículas migrarão para o ano <strong>{targetRolloverYear}</strong> com status <strong>"Pendente"</strong>.
+                    </li>
+                    <li>
+                      <strong>Progressão Automática de Turmas:</strong> As turmas regulares dos alunos avançam automaticamente para a colmeia seguinte com base na idade de corte (31/03/{targetRolloverYear}).
+                    </li>
+                    <li>
+                      <strong>Preservação de Acordos e Descontos:</strong> Os descontos em reais/%, opções de lanche/almoço e dia de vencimento são preservados como base para que a gestão possa renegociar.
+                    </li>
+                    <li>
+                      <strong>Escala de Contraturno em Amarelo:</strong> Na escala semanal e na matriz geral, as crianças serão destacadas em amarelo com selo <em>"Rematrícula {targetRolloverYear} Pendente"</em> até que o acordo seja confirmado.
+                    </li>
+                    <li>
+                      <strong>Histórico Preservado:</strong> Todos os dados de {activeYear} permanecem guardados e você poderá alternar entre os anos a qualquer momento.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <label className="font-bold text-slate-800 block text-xs">
+                    Confirmar Ano de Destino:
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={targetRolloverYear}
+                      onChange={(e) => setTargetRolloverYear(parseInt(e.target.value, 10))}
+                      disabled={isProcessingRollover}
+                      className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-brand-orange"
+                    >
+                      <option value={2027}>Ano Letivo 2027</option>
+                      <option value={2028}>Ano Letivo 2028</option>
+                    </select>
+                    <span className="text-slate-500 text-[11px]">
+                      {activeStudentsCount} alunos ativos serão processados.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsRolloverModalOpen(false)}
+                  disabled={isProcessingRollover}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRollover}
+                  disabled={isProcessingRollover}
+                  className="px-5 py-2 bg-brand-orange hover:bg-brand-orange-hover text-white text-xs font-bold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer font-display disabled:opacity-50"
+                >
+                  {isProcessingRollover ? (
+                    <>
+                      <RotateCw size={14} className="animate-spin" />
+                      <span>Processando Rematrículas...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={14} />
+                      <span>Iniciar Ciclo {targetRolloverYear}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

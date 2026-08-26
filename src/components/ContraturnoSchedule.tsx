@@ -8,6 +8,7 @@ interface ContraturnoScheduleProps {
   contraturnos: ContraturnoSegment[];
   enrollments?: Enrollment[];
   classPrices?: RegularClass[];
+  activeYear?: number;
   onUpdateContraturnoNatureza?: (alunoId: string, segmentId: string, newNatureza: 'Melaço' | 'Marmelada') => void;
   onUpdateContraturnoDays?: (alunoId: string, segmentId: string, newDays: WeekDay[]) => void;
 }
@@ -19,11 +20,13 @@ export default function ContraturnoSchedule({
   contraturnos,
   enrollments = [],
   classPrices = [],
+  activeYear = 2026,
   onUpdateContraturnoNatureza,
   onUpdateContraturnoDays
 }: ContraturnoScheduleProps) {
   const [viewMode, setViewMode] = useState<'semanal' | 'mensal'>('semanal');
   const [isPrintMode, setIsPrintMode] = useState<boolean>(false);
+  const [targetYear, setTargetYear] = useState<number>(activeYear === 2026 ? 2027 : activeYear);
 
   // Filters state for Matriz Geral
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -31,6 +34,7 @@ export default function ContraturnoSchedule({
   const [filterTurma, setFilterTurma] = useState<string>('todas');
   const [filterDia, setFilterDia] = useState<string>('todos');
   const [filterPeriodo, setFilterPeriodo] = useState<string>('todos');
+  const [filterStatusMatricula, setFilterStatusMatricula] = useState<string>('todas');
   const [sortBy, setSortBy] = useState<'nome_asc' | 'nome_desc' | 'natureza' | 'turma' | 'valor'>('nome_asc');
 
   const daysOfWeek: WeekDay[] = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
@@ -59,9 +63,42 @@ export default function ContraturnoSchedule({
   // Helper to find student details
   const getStudentInfo = (alunoId: string) => students.find(s => s.id === alunoId);
 
+  // Helper to find student enrollment in active year
+  const getStudentEnrollment = (alunoId: string) => {
+    return enrollments.find(e => e.alunoId === alunoId && e.ano === targetYear) || 
+           enrollments.find(e => e.alunoId === alunoId && e.ano === activeYear) || 
+           enrollments.find(e => e.alunoId === alunoId);
+  };
+
+  // Helper to accurately check if a student's enrollment/rematrícula is confirmed for the targetYear
+  const isStudentConfirmedForYear = (alunoId: string, yearToCheck: number = targetYear): boolean => {
+    // 1. Check direct enrollment record for yearToCheck
+    const directEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === yearToCheck);
+    if (directEnrollment) {
+      return directEnrollment.statusNegociacao === 'Confirmada';
+    }
+
+    // 2. If checking upcoming rematrícula cycle 2027 (when enrollment hasn't been rolled over yet)
+    if (yearToCheck === 2027) {
+      const prevEnrollment = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
+      if (prevEnrollment?.statusIntencao2027 === 'Confirmada') {
+        return true;
+      }
+      return false; // Not confirmed for 2027 -> PENDING (yellow highlight)
+    }
+
+    // 3. If checking 2026 cycle
+    if (yearToCheck === 2026) {
+      const enr2026 = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026);
+      return enr2026?.statusNegociacao === 'Confirmada';
+    }
+
+    return false;
+  };
+
   // Helper to find student regular class name
   const getStudentRegularClass = (alunoId: string) => {
-    const enr = enrollments.find(e => e.alunoId === alunoId && e.ano === 2026) || enrollments.find(e => e.alunoId === alunoId);
+    const enr = getStudentEnrollment(alunoId);
     if (!enr) return 'Sem Matrícula';
     if (enr.turmaRegularId === 'sem_regular') return 'Somente Contraturno';
     const cls = (classPrices.length > 0 ? classPrices : REGULAR_CLASSES).find(
@@ -80,9 +117,10 @@ export default function ContraturnoSchedule({
       .filter(c => c.diasSemana.includes(day))
       .map(c => {
         const student = getStudentInfo(c.alunoId);
-        return { segment: c, student };
+        const confirmed = student ? isStudentConfirmedForYear(student.id, targetYear) : false;
+        return { segment: c, student, isConfirmed: confirmed };
       })
-      .filter((item): item is { segment: ContraturnoSegment; student: Student } => {
+      .filter((item): item is { segment: ContraturnoSegment; student: Student; isConfirmed: boolean } => {
         if (!item.student || seenStudentIds.has(item.student.id)) return false;
         seenStudentIds.add(item.student.id);
         return true;
@@ -107,9 +145,10 @@ export default function ContraturnoSchedule({
       .map(c => {
         const student = getStudentInfo(c.alunoId);
         const regularClass = getStudentRegularClass(c.alunoId);
-        return { segment: c, student, regularClass };
+        const isConfirmed = student ? isStudentConfirmedForYear(student.id, targetYear) : false;
+        return { segment: c, student, regularClass, isConfirmed };
       })
-      .filter((item): item is { segment: ContraturnoSegment; student: Student; regularClass: string } => {
+      .filter((item): item is { segment: ContraturnoSegment; student: Student; regularClass: string; isConfirmed: boolean } => {
         if (!item.student) return false;
 
         // Search term
@@ -138,6 +177,14 @@ export default function ContraturnoSchedule({
           return false;
         }
 
+        // Status Matrícula
+        if (filterStatusMatricula === 'confirmada' && !item.isConfirmed) {
+          return false;
+        }
+        if (filterStatusMatricula === 'pendente' && item.isConfirmed) {
+          return false;
+        }
+
         return true;
       })
       .sort((a, b) => {
@@ -158,9 +205,9 @@ export default function ContraturnoSchedule({
         }
         return 0;
       });
-  }, [activeContraturnos, students, enrollments, classPrices, searchTerm, filterNatureza, filterTurma, filterDia, filterPeriodo, sortBy]);
+  }, [activeContraturnos, students, enrollments, classPrices, targetYear, activeYear, searchTerm, filterNatureza, filterTurma, filterDia, filterPeriodo, filterStatusMatricula, sortBy]);
 
-  const hasActiveFilters = searchTerm !== '' || filterNatureza !== 'todas' || filterTurma !== 'todas' || filterDia !== 'todos' || filterPeriodo !== 'todos' || sortBy !== 'nome_asc';
+  const hasActiveFilters = searchTerm !== '' || filterNatureza !== 'todas' || filterTurma !== 'todas' || filterDia !== 'todos' || filterPeriodo !== 'todos' || filterStatusMatricula !== 'todas' || sortBy !== 'nome_asc';
 
   const resetFilters = () => {
     setSearchTerm('');
@@ -168,6 +215,7 @@ export default function ContraturnoSchedule({
     setFilterTurma('todas');
     setFilterDia('todos');
     setFilterPeriodo('todos');
+    setFilterStatusMatricula('todas');
     setSortBy('nome_asc');
   };
 
@@ -288,8 +336,8 @@ export default function ContraturnoSchedule({
       {/* Header and print button */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-3">
         <div>
-          <h2 className="text-base font-bold text-slate-800 uppercase tracking-wider">
-            Escalas de Frequência do Contraturno
+          <h2 className="text-base font-bold text-slate-800 uppercase tracking-wider font-display">
+            Contraturno
           </h2>
           <p className="text-xs text-slate-500">
             Acompanhe a lista de alunos presentes por dia e emita relatórios amigáveis para impressão.
@@ -335,17 +383,48 @@ export default function ContraturnoSchedule({
       {/* Dynamic Views */}
       {viewMode === 'semanal' ? (
         <div className="space-y-3">
-          {/* Legend Banner */}
-          <div className="bg-amber-50/90 border border-amber-200/90 rounded-lg p-2.5 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-2">
-              <Info size={15} className="text-amber-600 shrink-0" />
-              <span>
-                <strong className="text-amber-900 font-bold">* Asterisco (*):</strong> Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.
-              </span>
+          {/* Legend Banner with Target Year selector */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Info size={15} className="text-amber-600 shrink-0" />
+                <span>
+                  <strong className="text-amber-900 font-bold">* Asterisco (*):</strong> Crianças com saída antecipada às 15h (Parcial). As demais saem às 17h30.
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-amber-200/90 px-2.5 py-1 rounded border border-amber-400/90 shadow-2xs">
+                <span className="w-2.5 h-2.5 rounded-sm bg-amber-400 border border-amber-600 animate-pulse"></span>
+                <span className="text-[11px] font-bold text-amber-950">
+                  Amarelo: Matrícula / Rematrícula {targetYear} Pendente
+                </span>
+              </div>
             </div>
-            <span className="text-[10px] text-slate-500 font-medium">
-              Altere a turma (Melaço / Marmelada) no próprio card do aluno ou na Matriz Geral.
-            </span>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] font-bold text-slate-600">Verificar Ano:</span>
+              <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-xs shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setTargetYear(2026)}
+                  className={`px-2 py-0.5 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                    targetYear === 2026 ? 'bg-orange-500 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Exibir status do ano letivo 2026"
+                >
+                  2026
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetYear(2027)}
+                  className={`px-2 py-0.5 text-[11px] font-bold rounded transition-all cursor-pointer ${
+                    targetYear === 2027 ? 'bg-orange-500 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Exibir status das rematrículas para 2027"
+                >
+                  2027 (Rematrícula)
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* WEEKLY DIARY COLUMNS */}
@@ -377,26 +456,57 @@ export default function ContraturnoSchedule({
                         </span>
                         <span>({melaco.length})</span>
                       </span>
-                      <div className="space-y-1">
-                        {melaco.map(({ segment, student }) => (
-                          <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:shadow-2xs transition-all flex items-center justify-between gap-1">
-                            <span className="font-bold text-[11px] text-slate-800 block leading-tight">
-                              {student?.nome}
-                              {segment.periodo === 'Parcial' && (
-                                <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
-                              )}
-                            </span>
+                      <div className="space-y-1.5">
+                        {melaco.map(({ segment, student, isConfirmed }) => (
+                          <div 
+                            key={segment.id} 
+                            className={`p-2 rounded-md transition-all flex flex-col gap-1 border ${
+                              !isConfirmed 
+                                ? 'bg-amber-100/90 border-amber-400 ring-1 ring-amber-400/70 shadow-2xs hover:bg-amber-100' 
+                                : 'bg-slate-50 border-slate-200 hover:bg-white hover:shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`font-bold text-[11px] block leading-tight ${!isConfirmed ? 'text-amber-950' : 'text-slate-800'}`}>
+                                {student?.nome}
+                                {segment.periodo === 'Parcial' && (
+                                  <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                                )}
+                              </span>
 
-                            {onUpdateContraturnoNatureza && (
-                              <select
-                                value={segment.natureza}
-                                onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
-                                className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
-                                title="Trocar turma de contraturno"
-                              >
-                                <option value="Melaço">Melaço</option>
-                                <option value="Marmelada">Marmelada</option>
-                              </select>
+                              {onUpdateContraturnoNatureza && (
+                                <select
+                                  value={segment.natureza}
+                                  onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
+                                  className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
+                                  title="Trocar turma de contraturno"
+                                >
+                                  <option value="Melaço">Melaço</option>
+                                  <option value="Marmelada">Marmelada</option>
+                                </select>
+                              )}
+                            </div>
+
+                            {!isConfirmed ? (
+                              <div className="flex items-center justify-between text-[9px] font-bold text-amber-900 pt-1 border-t border-amber-300/80">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                                  Rematrícula {targetYear}
+                                </span>
+                                <span className="uppercase text-[8px] bg-amber-300 text-amber-950 px-1.5 py-0.5 rounded font-extrabold border border-amber-400/80">
+                                  Pendente
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between text-[9px] font-medium text-emerald-800 pt-0.5 border-t border-emerald-200/50">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  {targetYear}
+                                </span>
+                                <span className="text-[8px] text-emerald-800 font-bold">
+                                  Confirmada
+                                </span>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -415,26 +525,57 @@ export default function ContraturnoSchedule({
                         </span>
                         <span>({marmelada.length})</span>
                       </span>
-                      <div className="space-y-1">
-                        {marmelada.map(({ segment, student }) => (
-                          <div key={segment.id} className="p-1.5 rounded bg-slate-50 border border-slate-200 hover:bg-white hover:shadow-2xs transition-all flex items-center justify-between gap-1">
-                            <span className="font-bold text-[11px] text-slate-800 block leading-tight">
-                              {student?.nome}
-                              {segment.periodo === 'Parcial' && (
-                                <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
-                              )}
-                            </span>
+                      <div className="space-y-1.5">
+                        {marmelada.map(({ segment, student, isConfirmed }) => (
+                          <div 
+                            key={segment.id} 
+                            className={`p-2 rounded-md transition-all flex flex-col gap-1 border ${
+                              !isConfirmed 
+                                ? 'bg-amber-100/90 border-amber-400 ring-1 ring-amber-400/70 shadow-2xs hover:bg-amber-100' 
+                                : 'bg-slate-50 border-slate-200 hover:bg-white hover:shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className={`font-bold text-[11px] block leading-tight ${!isConfirmed ? 'text-amber-950' : 'text-slate-800'}`}>
+                                {student?.nome}
+                                {segment.periodo === 'Parcial' && (
+                                  <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                                )}
+                              </span>
 
-                            {onUpdateContraturnoNatureza && (
-                              <select
-                                value={segment.natureza}
-                                onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
-                                className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
-                                title="Trocar turma de contraturno"
-                              >
-                                <option value="Melaço">Melaço</option>
-                                <option value="Marmelada">Marmelada</option>
-                              </select>
+                              {onUpdateContraturnoNatureza && (
+                                <select
+                                  value={segment.natureza}
+                                  onChange={(e) => onUpdateContraturnoNatureza(student.id, segment.id, e.target.value as 'Melaço' | 'Marmelada')}
+                                  className="text-[9px] font-bold px-1 py-0.2 rounded border border-slate-200 bg-white text-slate-600 cursor-pointer hover:border-orange-400 focus:outline-none shrink-0"
+                                  title="Trocar turma de contraturno"
+                                >
+                                  <option value="Melaço">Melaço</option>
+                                  <option value="Marmelada">Marmelada</option>
+                                </select>
+                              )}
+                            </div>
+
+                            {!isConfirmed ? (
+                              <div className="flex items-center justify-between text-[9px] font-bold text-amber-900 pt-1 border-t border-amber-300/80">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                                  Rematrícula {targetYear}
+                                </span>
+                                <span className="uppercase text-[8px] bg-amber-300 text-amber-950 px-1.5 py-0.5 rounded font-extrabold border border-amber-400/80">
+                                  Pendente
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between text-[9px] font-medium text-emerald-800 pt-0.5 border-t border-emerald-200/50">
+                                <span className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                  {targetYear}
+                                </span>
+                                <span className="text-[8px] text-emerald-800 font-bold">
+                                  Confirmada
+                                </span>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -468,7 +609,7 @@ export default function ContraturnoSchedule({
 
           {/* FILTER TOOLBAR */}
           <div className="p-3 bg-slate-100/70 border-b border-slate-200 space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2">
               {/* Search by name */}
               <div className="relative lg:col-span-2">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -533,6 +674,19 @@ export default function ContraturnoSchedule({
                 </select>
               </div>
 
+              {/* Filter by Status Matrícula */}
+              <div>
+                <select
+                  value={filterStatusMatricula}
+                  onChange={(e) => setFilterStatusMatricula(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 text-slate-800 font-medium"
+                >
+                  <option value="todas">Status Matrícula ({targetYear})</option>
+                  <option value="confirmada">✓ Apenas Confirmadas</option>
+                  <option value="pendente">⏳ Apenas Pendentes</option>
+                </select>
+              </div>
+
               {/* Sort selector */}
               <div>
                 <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-2 py-1">
@@ -577,6 +731,7 @@ export default function ContraturnoSchedule({
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="p-3">Estudante</th>
+                  <th className="p-3">Status ({targetYear})</th>
                   <th className="p-3">Turma Regular</th>
                   <th className="p-3">Grupo Contraturno</th>
                   {daysOfWeek.map(day => (
@@ -588,13 +743,29 @@ export default function ContraturnoSchedule({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-150 text-xs text-slate-700">
-                {filteredAndSortedMatrix.map(({ segment: c, student, regularClass }) => {
+                {filteredAndSortedMatrix.map(({ segment: c, student, regularClass, isConfirmed }) => {
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr 
+                      key={c.id} 
+                      className={`transition-colors ${
+                        !isConfirmed ? 'bg-amber-100/40 hover:bg-amber-100/70' : 'hover:bg-slate-50/50'
+                      }`}
+                    >
                       <td className="p-3 font-bold text-slate-800">
                         {student.nome}
                         {c.periodo === 'Parcial' && (
                           <span className="text-amber-600 font-extrabold ml-1" title="Saída às 15h (Parcial)">*</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {isConfirmed ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            ✓ Confirmada
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-950 border border-amber-400">
+                            ⏳ Rematrícula {targetYear} Pendente
+                          </span>
                         )}
                       </td>
                       <td className="p-3 font-semibold text-slate-600">

@@ -96,14 +96,13 @@ export default function CartaIntencaoForm({
     if (enrollment?.horarioSaida2027 === '15:30' || enrollment?.horarioSaida2027 === '17:30') {
       return enrollment.horarioSaida2027;
     }
+    if (enrollment?.periodoContraturno2027 === 'Parcial' || activeContraturno?.periodo === 'Parcial') {
+      return '15:30';
+    }
     return '17:30';
   });
 
-  const [periodoContraturno, setPeriodoContraturno] = useState<'Parcial' | 'Completo'>(() => {
-    if (enrollment?.periodoContraturno2027) return enrollment.periodoContraturno2027;
-    if (activeContraturno?.periodo) return activeContraturno.periodo;
-    return 'Parcial';
-  });
+  const periodoContraturno: 'Parcial' | 'Completo' = horarioSaida === '17:30' ? 'Completo' : 'Parcial';
 
   const [adicionarLanche, setAdicionarLanche] = useState<boolean>(() => {
     if (enrollment?.adicionarLanche2027 !== undefined) return enrollment.adicionarLanche2027;
@@ -616,50 +615,27 @@ export default function CartaIntencaoForm({
                       </div>
                     </div>
 
-                    {/* Exit Time & Period Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Horário de Saída (Contraturno):
-                        </label>
-                        <select
-                          value={horarioSaida}
-                          onChange={(e) => setHorarioSaida(e.target.value as any)}
-                          className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
-                        >
-                          {EXIT_TIMES.map(t => (
-                            <option key={t} value={t}>Saída até {t}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Período do Contraturno:
-                        </label>
-                        <select
-                          value={periodoContraturno}
-                          onChange={(e) => setPeriodoContraturno(e.target.value as any)}
-                          className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
-                        >
-                          <option value="Parcial">Parcial (4 Horas)</option>
-                          <option value="Completo">Completo (Período Integral)</option>
-                        </select>
-                      </div>
+                    {/* Exit Time Selection */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Horário de Saída (Contraturno):
+                      </label>
+                      <select
+                        value={horarioSaida}
+                        onChange={(e) => setHorarioSaida(e.target.value as any)}
+                        className="w-full bg-white border border-slate-300 rounded-md py-1.5 px-2.5 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-brand-orange outline-none"
+                      >
+                        {EXIT_TIMES.map(t => (
+                          <option key={t} value={t}>Saída até {t}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Servico Opcional: Almoço na Escola (Apenas se NÃO optar por Contraturno) */}
-              {contraturnoDesejado ? (
-                <div className="bg-amber-50/80 p-3 rounded-lg border border-amber-200 text-xs text-amber-900 flex items-center gap-2">
-                  <Utensils size={16} className="text-amber-600 shrink-0" />
-                  <span>
-                    <strong>Almoço e permanência:</strong> Já inclusos na opção do Contraturno. A opção de "Almoço na Escola" é ativada apenas se o aluno NÃO cursar o Contraturno.
-                  </span>
-                </div>
-              ) : (
+              {!contraturnoDesejado && (
                 <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer select-none">

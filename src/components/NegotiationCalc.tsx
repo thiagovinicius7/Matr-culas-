@@ -11,6 +11,7 @@ interface NegotiationCalcProps {
   contraturnos: ContraturnoSegment[];
   classPrices: RegularClass[];
   contraturnoPrices: ContraturnoPrice[];
+  activeYear?: number;
   selectedStudentId?: string;
   onSelectStudent?: (id: string) => void;
   onConfirmNegotiation: (
@@ -27,12 +28,19 @@ export default function NegotiationCalc({
   contraturnos,
   classPrices,
   contraturnoPrices,
+  activeYear = 2026,
   selectedStudentId: propSelectedStudentId,
   onSelectStudent,
   onConfirmNegotiation
 }: NegotiationCalcProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string>(propSelectedStudentId || '');
-  const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [selectedYear, setSelectedYear] = useState<number>(activeYear);
+
+  useEffect(() => {
+    if (activeYear) {
+      setSelectedYear(activeYear);
+    }
+  }, [activeYear]);
 
   useEffect(() => {
     if (propSelectedStudentId) {
@@ -49,14 +57,16 @@ export default function NegotiationCalc({
   const [contraturnoDiscountInput, setContraturnoDiscountInput] = useState<number>(0);
 
   const [addLanche, setAddLanche] = useState<boolean>(false);
-  const [lancheValue, setLancheValue] = useState<number>(200);
+  const [lancheValue, setLancheValue] = useState<number>(250);
 
   const [addAlmoco, setAddAlmoco] = useState<boolean>(false);
-  const [almocoValue, setAlmocoValue] = useState<number>(250);
+  const [almocoValue, setAlmocoValue] = useState<number>(500);
+
+  const [diaVencimento, setDiaVencimento] = useState<'01' | '05' | '10' | '15' | '20'>('05');
 
   const [negotiationStatus, setNegotiationStatus] = useState<Enrollment['statusNegociacao']>('Em Negociação');
   const [notes, setNotes] = useState<string>('');
-  const [descontoPontualidadeRegular, setDescontoPontualidadeRegular] = useState<boolean>(false);
+  const [descontoPontualidadeRegular, setDescontoPontualidadeRegular] = useState<boolean>(true);
   const [descontoPontualidadeContraturno, setDescontoPontualidadeContraturno] = useState<boolean>(false);
 
   // Contraturno choice
@@ -142,13 +152,14 @@ export default function NegotiationCalc({
         setNegotiationStatus(existing.statusNegociacao);
         setNotes(existing.anotacoes);
         setAddLanche(existing.adicionarLanche !== undefined ? existing.adicionarLanche : false);
-        setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 200);
+        setLancheValue(existing.valorLanche !== undefined ? existing.valorLanche : 250);
         setAddAlmoco(existing.adicionarAlmoco !== undefined ? existing.adicionarAlmoco : false);
-        setAlmocoValue(existing.valorAlmoco !== undefined ? existing.valorAlmoco : 250);
+        setAlmocoValue(existing.valorAlmoco !== undefined ? existing.valorAlmoco : 500);
+        setDiaVencimento((existing.diaVencimento || existing.diaVencimento2027 || '05') as any);
         
         const hasRegPont = existing.descontoPontualidadeRegular !== undefined 
           ? existing.descontoPontualidadeRegular 
-          : (existing.descontoPontualidade !== undefined ? existing.descontoPontualidade : false);
+          : (existing.descontoPontualidade !== undefined ? existing.descontoPontualidade : true);
         const hasContPont = existing.descontoPontualidadeContraturno !== undefined 
           ? existing.descontoPontualidadeContraturno 
           : false;
@@ -164,10 +175,11 @@ export default function NegotiationCalc({
         setNegotiationStatus('Em Negociação');
         setNotes('');
         setAddLanche(false);
-        setLancheValue(200);
+        setLancheValue(250);
         setAddAlmoco(false);
-        setAlmocoValue(250);
-        setDescontoPontualidadeRegular(false);
+        setAlmocoValue(500);
+        setDiaVencimento('05');
+        setDescontoPontualidadeRegular(true);
         setDescontoPontualidadeContraturno(false);
       }
 
@@ -217,9 +229,12 @@ export default function NegotiationCalc({
       valorLanche: includeRegular && addLanche && regularClass?.natureza === 'Fundamental' ? lancheValue : 0,
       adicionarAlmoco: addAlmoco,
       valorAlmoco: addAlmoco ? almocoValue : 0,
+      diaVencimento: diaVencimento,
       descontoPontualidadeRegular: descontoPontualidadeRegular,
       descontoPontualidadeContraturno: descontoPontualidadeContraturno,
-      descontoPontualidade: descontoPontualidadeRegular || descontoPontualidadeContraturno
+      descontoPontualidade: descontoPontualidadeRegular || descontoPontualidadeContraturno,
+      horarioSaida2027: contraturnoPeriod === 'Completo' ? '17:30' : '15:30',
+      periodoContraturno2027: contraturnoPeriod
     };
 
     const contraturnoData: Omit<ContraturnoSegment, 'id' | 'alunoId'> | null = enableContraturno && weeklyFrequency > 0 ? {
@@ -357,7 +372,7 @@ export default function NegotiationCalc({
                   )}
                 </div>
 
-                {/* Option to add snack fee for Fundamental class */}
+                {/* Option to add snack fee for Fundamental regular class */}
                 {regularClass?.natureza === 'Fundamental' && (
                   <div className="p-3 bg-orange-50/60 rounded-lg border border-orange-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
                     <div className="flex items-center gap-2">
@@ -368,13 +383,13 @@ export default function NegotiationCalc({
                         onChange={(e) => {
                           setAddLanche(e.target.checked);
                           if (e.target.checked && !lancheValue) {
-                            setLancheValue(200);
+                            setLancheValue(250);
                           }
                         }}
                         className="w-4 h-4 text-orange-600 focus:ring-orange-500 border-slate-300 rounded cursor-pointer"
                       />
                       <label htmlFor="add-lanche" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
-                        Acrescentar Valor do Lanche (R$ 200,00)
+                        Lanche no Ensino Regular (R$ 250,00/mês)
                       </label>
                     </div>
                     {addLanche && (
@@ -388,7 +403,7 @@ export default function NegotiationCalc({
                             value={lancheValue || ''}
                             onChange={(e) => setLancheValue(Number(e.target.value))}
                             className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-slate-200 focus:border-orange-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
-                            placeholder="200"
+                            placeholder="250"
                           />
                         </div>
                       </div>
@@ -396,48 +411,70 @@ export default function NegotiationCalc({
                   </div>
                 )}
 
-                {/* Option to add lunch fee */}
-                <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="add-almoco"
-                      checked={addAlmoco}
-                      onChange={(e) => {
-                        setAddAlmoco(e.target.checked);
-                        if (e.target.checked && !almocoValue) {
-                          setAlmocoValue(250);
-                        }
-                      }}
-                      className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
-                    />
-                    <label htmlFor="add-almoco" className="text-xs font-bold text-slate-800 select-none cursor-pointer flex items-center gap-1.5">
-                      <span>🍲</span> Acrescentar Valor do Almoço (Contraturno)
-                    </label>
-                  </div>
-                  {addAlmoco && (
+                {/* Option to add lunch fee (Almoço na Escola para quem não opta pelo contraturno) */}
+                {!enableContraturno && (
+                  <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200/90 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase">Valor do Almoço:</span>
-                      <div className="relative w-28">
-                        <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-mono">R$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={almocoValue || ''}
-                          onChange={(e) => setAlmocoValue(Number(e.target.value))}
-                          className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-amber-300 focus:border-amber-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
-                          placeholder="250"
-                        />
-                      </div>
+                      <input
+                        type="checkbox"
+                        id="add-almoco"
+                        checked={addAlmoco}
+                        onChange={(e) => {
+                          setAddAlmoco(e.target.checked);
+                          if (e.target.checked && !almocoValue) {
+                            setAlmocoValue(500);
+                          }
+                        }}
+                        className="w-4 h-4 text-amber-600 focus:ring-amber-500 border-slate-300 rounded cursor-pointer"
+                      />
+                      <label htmlFor="add-almoco" className="text-xs font-bold text-slate-800 select-none cursor-pointer flex items-center gap-1.5">
+                        <span>🍲</span> Almoço na Escola (sem Contraturno: R$ 500,00/mês)
+                      </label>
                     </div>
-                  )}
-                </div>
+                    {addAlmoco && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Valor do Almoço:</span>
+                        <div className="relative w-28">
+                          <span className="absolute left-2.5 top-1.5 text-[10px] text-slate-400 font-mono">R$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={almocoValue || ''}
+                            onChange={(e) => setAlmocoValue(Number(e.target.value))}
+                            className="w-full text-xs pl-7 pr-2 py-1 rounded-md border border-amber-300 focus:border-amber-500 focus:outline-none bg-white font-mono font-bold text-slate-800"
+                            placeholder="500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* Options to add prompt payment discount */}
-                <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200/80 space-y-2">
-                  <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">
-                    Desconto de Pontualidade (3% até o vencimento)
-                  </span>
+                {/* Dia de Vencimento e Desconto de Pontualidade */}
+                <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider block">
+                      Dia de Vencimento & Desconto de Pontualidade (3% até o dia escolhido)
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-blue-950 mr-1">Dia Desejado:</span>
+                      {(['01', '05', '10', '15', '20'] as const).map(dia => (
+                        <button
+                          key={dia}
+                          type="button"
+                          onClick={() => setDiaVencimento(dia)}
+                          className={`px-2 py-0.5 text-xs font-bold rounded cursor-pointer transition-all ${
+                            diaVencimento === dia
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-white text-blue-900 border border-blue-200 hover:bg-blue-100'
+                          }`}
+                        >
+                          Dia {dia}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="flex items-center gap-2 bg-white/80 p-2 rounded border border-blue-100">
                       <input
@@ -449,7 +486,7 @@ export default function NegotiationCalc({
                         disabled={!includeRegular}
                       />
                       <label htmlFor="desconto-pontualidade-regular" className={`text-xs font-bold select-none cursor-pointer ${!includeRegular ? 'text-slate-400' : 'text-slate-700'}`}>
-                        Ensino Regular (3% Off)
+                        Ensino Regular (3% Off até dia {diaVencimento})
                       </label>
                       {descontoPontualidadeRegular && includeRegular && (
                         <span className="ml-auto text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded uppercase">
@@ -468,7 +505,7 @@ export default function NegotiationCalc({
                         disabled={!enableContraturno || weeklyFrequency === 0}
                       />
                       <label htmlFor="desconto-pontualidade-contraturno" className={`text-xs font-bold select-none cursor-pointer ${(!enableContraturno || weeklyFrequency === 0) ? 'text-slate-400' : 'text-slate-700'}`}>
-                        Contraturno (3% Off)
+                        Contraturno (3% Off até dia {diaVencimento})
                       </label>
                       {descontoPontualidadeContraturno && enableContraturno && weeklyFrequency > 0 && (
                         <span className="ml-auto text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded uppercase">
@@ -601,31 +638,15 @@ export default function NegotiationCalc({
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-600 block">Período de Permanência</label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center gap-1.5 text-xs text-slate-700 font-bold cursor-pointer">
-                            <input
-                              type="radio"
-                              name="periodo"
-                              value="Parcial"
-                              checked={contraturnoPeriod === 'Parcial'}
-                              onChange={() => setContraturnoPeriod('Parcial')}
-                              className="text-emerald-600 focus:ring-emerald-500"
-                            />
-                            Parcial (Meio período)
-                          </label>
-                          <label className="flex items-center gap-1.5 text-xs text-slate-700 font-bold cursor-pointer">
-                            <input
-                              type="radio"
-                              name="periodo"
-                              value="Completo"
-                              checked={contraturnoPeriod === 'Completo'}
-                              onChange={() => setContraturnoPeriod('Completo')}
-                              className="text-emerald-600 focus:ring-emerald-500"
-                            />
-                            Completo (Integral)
-                          </label>
-                        </div>
+                        <label className="text-xs font-bold text-slate-600 block">Horário de Saída (Contraturno)</label>
+                        <select
+                          value={contraturnoPeriod === 'Completo' ? '17:30' : '15:30'}
+                          onChange={(e) => setContraturnoPeriod(e.target.value === '17:30' ? 'Completo' : 'Parcial')}
+                          className="w-full text-xs px-2.5 py-1.5 rounded-md border border-slate-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 focus:outline-none bg-white font-medium cursor-pointer text-slate-800"
+                        >
+                          <option value="15:30">Saída até 15:30</option>
+                          <option value="17:30">Saída até 17:30</option>
+                        </select>
                       </div>
 
                       {/* Contraturno discount field */}

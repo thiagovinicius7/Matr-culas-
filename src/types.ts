@@ -60,6 +60,7 @@ export interface Enrollment {
   valorLanche?: number;
   adicionarAlmoco?: boolean;
   valorAlmoco?: number;
+  diaVencimento?: '01' | '05' | '10' | '15' | '20';
   descontoPontualidade?: boolean; // legacy or backward compatibility alias
   descontoPontualidadeRegular?: boolean;
   descontoPontualidadeContraturno?: boolean;
@@ -87,7 +88,7 @@ export interface FinancialMovement {
   id: string;
   alunoId: string;
   data: string; // YYYY-MM-DD
-  tipo: 'Matrícula' | 'Contraturno_Ativação' | 'Contraturno_Cancelamento' | 'Desconto_Alterado' | 'Reajuste_Geral';
+  tipo: 'Matrícula' | 'Contraturno_Ativação' | 'Contraturno_Cancelamento' | 'Desconto_Alterado' | 'Reajuste_Geral' | 'Transição_Ano_Letivo';
   descricao: string;
   valorAnterior: number; // Previous total monthly sum
   valorNovo: number; // New total monthly sum
